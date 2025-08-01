@@ -1,0 +1,37 @@
+{
+  "name": "memory-server",
+  "version": "1.0.0",
+  "description": "A developer memory server hosted on Cloudflare with MCP support",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "wrangler deploy --dry-run",
+    "db:migrate": "wrangler d1 migrations apply memory-db",
+    "db:create-migration": "wrangler d1 migrations create memory-db",
+    "ui:dev": "cd ui && npm run dev",
+    "ui:build": "cd ui && npm run build",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@hono/node-server": "^1.8.0",
+    "uuid": "^9.0.0",
+    "@mcp/sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "wrangler": "^3.25.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.11.0"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "memory",
+    "mcp",
+    "development"
+  ],
+  "author": "",
+  "license": "MIT"
+}
