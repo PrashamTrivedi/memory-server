@@ -1,7 +1,7 @@
 {
   "name": "memory-server",
   "main": "src/index.ts",
-  "compatibility_date": "2024-01-01",
+  "compatibility_date": "2025-08-15",
   "compatibility_flags": [
     "nodejs_compat"
   ],
@@ -31,8 +31,5 @@
   "browser": {
     "binding": "BROWSER"
   },
-  // Build configuration
-  "build": {
-    "command": ""
-  }
+  
 }
