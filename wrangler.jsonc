@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "memory-db",
-      "database_id": "your-database-id-will-be-here"
+      "database_id": "8331bbd8-20cb-40b3-a12f-52851bc08227"
     }
   ],
   
@@ -17,7 +17,7 @@
   "kv_namespaces": [
     {
       "binding": "CACHE_KV",
-      "id": "your-kv-namespace-id-will-be-here"
+      "id": "32ccd77eecf84aa08f3ded49aeb8ca69"
     }
   ],
   
