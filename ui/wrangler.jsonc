@@ -1,0 +1,27 @@
+{
+  "name": "memory-server-ui",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-08-15",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "../dist/ui",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "API_BASE_URL": "https://memory-server.your-worker.workers.dev"
+  },
+  "env": {
+    "development": {
+      "vars": {
+        "ENVIRONMENT": "development",
+        "API_BASE_URL": "http://localhost:8787"
+      }
+    }
+  }
+}

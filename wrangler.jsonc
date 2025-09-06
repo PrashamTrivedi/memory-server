@@ -2,8 +2,12 @@
   "name": "memory-server",
   "main": "src/index.ts",
   "compatibility_date": "2024-01-01",
-  "compatibility_flags": ["nodejs_compat"],
-  
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
   // D1 Database binding for storing memories
   "d1_databases": [
     {
@@ -12,7 +16,6 @@
       "database_id": "8331bbd8-20cb-40b3-a12f-52851bc08227"
     }
   ],
-  
   // KV binding for caching URL content
   "kv_namespaces": [
     {
@@ -20,20 +23,14 @@
       "id": "32ccd77eecf84aa08f3ded49aeb8ca69"
     }
   ],
-  
   // Environment variables
   "vars": {
     "ENVIRONMENT": "development"
   },
-  
   // Browser rendering for URL content fetching
   "browser": {
     "binding": "BROWSER"
   },
-  
-  // Enable Node.js compatibility for UUID and other modules
-  "node_compat": true,
-  
   // Build configuration
   "build": {
     "command": ""
