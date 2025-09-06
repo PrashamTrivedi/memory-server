@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { MemoryManagement } from './pages';
+import { TagManagement, MemoryManagement } from './pages';
 import { useTheme } from './contexts/ThemeContext';
 import { useMemoryStats } from './api/memory';
 import './App.css';
+import './components/TagHierarchy.css';
 
-type AppView = 'home' | 'memories';
+type AppView = 'home' | 'tags' | 'memories';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('memories'); // Default to memories view
@@ -13,6 +14,8 @@ function App() {
 
   const renderView = () => {
     switch (currentView) {
+      case 'tags':
+        return <TagManagement />;
       case 'memories':
         return <MemoryManagement />;
       default:
@@ -40,6 +43,18 @@ function App() {
                   <li>URL references</li>
                 </ul>
                 <button className="card-button">Manage Memories</button>
+              </div>
+              
+              <div className="feature-card" onClick={() => setCurrentView('tags')}>
+                <h3>Tag Management</h3>
+                <p>Organize your knowledge with hierarchical tags and relationships</p>
+                <ul>
+                  <li>Visual tree editor</li>
+                  <li>Parent-child relationships</li>
+                  <li>Bulk operations</li>
+                  <li>Tag hierarchies</li>
+                </ul>
+                <button className="card-button">Manage Tags</button>
               </div>
             </div>
           </div>
@@ -84,6 +99,16 @@ function App() {
               <path d="M9 12H15M9 16H15M17 21H7C6.46957 21 5.96086 20.7893 5.58579 20.4142C5.21071 20.0391 5 19.5304 5 19V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H12.586C12.8512 3.00006 13.1055 3.10545 13.293 3.293L18.707 8.707C18.8946 8.89449 18.9999 9.14881 19 9.414V19C19 19.5304 18.7893 20.0391 18.4142 20.4142C18.0391 20.7893 17.5304 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Memories
+          </button>
+          <button 
+            className={`nav-button ${currentView === 'tags' ? 'active' : ''}`}
+            onClick={() => setCurrentView('tags')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M20.59 13.41L13.42 20.58C13.2343 20.7656 13.0136 20.9135 12.7709 21.0141C12.5282 21.1148 12.2678 21.1666 12.005 21.1666C11.7422 21.1666 11.4818 21.1148 11.2391 21.0141C10.9964 20.9135 10.7757 20.7656 10.59 20.58L2 12V2H12L20.59 10.59C20.9625 10.9647 21.1716 11.4716 21.1716 12C21.1716 12.5284 20.9625 13.0353 20.59 13.41Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7 7H7.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Tags
           </button>
           <button 
             className={`nav-button ${currentView === 'home' ? 'active' : ''}`}

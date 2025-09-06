@@ -1,4 +1,7 @@
 // Component exports
+export { TagTree } from './TagTree';
+export { TreeNode } from './TreeNode';
+export { TagSelector, SingleTagSelector } from './TagSelector';
 export { SearchBar } from './SearchBar';
 export { MemoryCard } from './MemoryCard';
 export { MemoryList } from './MemoryList';
