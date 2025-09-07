@@ -8,7 +8,7 @@ interface SearchBarProps {
   className?: string;
 }
 
-export function SearchBar({ onSearch, placeholder = "Search memories...", className = "" }: SearchBarProps) {
+export function SearchBar({ onSearch, placeholder = "Search memories by title or content...", className = "" }: SearchBarProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 300);
 

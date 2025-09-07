@@ -122,7 +122,7 @@ export function MemoryManagement() {
       <div className="search-container">
         <SearchBar
           onSearch={handleSearch}
-          placeholder="Search memories by content or tags..."
+          placeholder="Search memories by title, content or tags..."
         />
       </div>
     </div>
