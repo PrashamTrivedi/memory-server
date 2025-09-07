@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
-import { MCPMemoryServer } from './mcp/server';
+import { handleMCPHttpRequest } from './mcp/server';
 
 export interface Env {
   DB: D1Database;
@@ -45,8 +45,7 @@ app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
 // MCP endpoint
 app.all('/mcp', async (c) => {
   try {
-    const mcpServer = new MCPMemoryServer(c.env);
-    return await mcpServer.handleHttpRequest(c.req.raw);
+    return await handleMCPHttpRequest(c.env, c.req.raw);
   } catch (error) {
     console.error('MCP endpoint error:', error);
     return c.json({

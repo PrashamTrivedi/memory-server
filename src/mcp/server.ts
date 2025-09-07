@@ -1,13 +1,9 @@
-import { HttpStreamableTransport } from './transport/http.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Env } from '../index.js';
+import { CloudflareStreamableHttpTransport } from './transport/streamableHttp.js';
 
-// Tool imports
+// Tool handlers
 import {
-  addMemoryTool,
-  getMemoryTool,
-  listMemoriesTool,
-  deleteMemoryTool,
-  updateUrlContentTool,
   handleAddMemory,
   handleGetMemory,
   handleListMemories,
@@ -16,265 +12,375 @@ import {
 } from './tools/memory.js';
 
 import {
-  findMemoriesTool,
-  addTagsTool,
   handleFindMemories,
   handleAddTags,
 } from './tools/search.js';
 
-// Resource imports
+// Resource handlers
 import {
-  memoryResource,
-  memoryTextResource,
   handleMemoryResource,
   handleMemoryTextResource,
   listMemoryResources,
 } from './resources/memory.js';
 
-// Prompt imports
+// Prompt handlers
 import {
   availableWorkflowPrompts,
   getWorkflowPrompt,
 } from './prompts/workflows.js';
 
 /**
- * Complete MCP Server implementation for Memory Server
- * Provides tools, resources, and prompts with HTTP streamable transport
+ * Create and configure MCP Memory Server using the official TypeScript SDK
  */
-export class MCPMemoryServer {
-  private env: Env;
+export function createMCPMemoryServer(env: Env): McpServer {
+  const server = new McpServer({
+    name: 'memory-server-mcp',
+    version: '1.0.0',
+  });
 
-  constructor(env: Env) {
-    this.env = env;
-  }
-
-  /**
-   * Handle tool calls directly
-   */
-  async handleToolCall(name: string, args: any): Promise<any> {
-    try {
-      switch (name) {
-        case 'add_memory':
-          return await handleAddMemory(this.env, args);
-        case 'get_memory':
-          return await handleGetMemory(this.env, args);
-        case 'list_memories':
-          return await handleListMemories(this.env, args);
-        case 'delete_memory':
-          return await handleDeleteMemory(this.env, args);
-        case 'update_url_content':
-          return await handleUpdateUrlContent(this.env, args);
-        case 'find_memories':
-          return await handleFindMemories(this.env, args);
-        case 'add_tags':
-          return await handleAddTags(this.env, args);
-        default:
-          throw new Error(`Unknown tool: ${name}`);
-      }
-    } catch (error) {
+  // Register memory management tools
+  server.registerTool(
+    'add_memory',
+    {
+      title: 'Add Memory',
+      description: 'Add a new memory to the server with optional URL content fetching',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description: 'Name or title of the memory',
+          },
+          content: {
+            type: 'string',
+            description: 'Content of the memory',
+          },
+          url: {
+            type: 'string',
+            description: 'Optional URL to fetch content from',
+            format: 'uri',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional tags to associate with the memory',
+          },
+        },
+        required: ['name', 'content'],
+      },
+    },
+    async (args) => {
+      const result = await handleAddMemory(env, args);
       return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
       };
     }
-  }
+  );
 
-  /**
-   * List available tools
-   */
-  getTools() {
-    return [
-      addMemoryTool,
-      getMemoryTool,
-      listMemoriesTool,
-      deleteMemoryTool,
-      updateUrlContentTool,
-      findMemoriesTool,
-      addTagsTool,
-    ];
-  }
-
-  /**
-   * Handle resource requests
-   */
-  async handleResourceRequest(uri: string): Promise<any> {
-    try {
-      if (uri.startsWith('memory://') && uri.endsWith('/text')) {
-        return await handleMemoryTextResource(this.env, uri);
-      } else if (uri.startsWith('memory://')) {
-        return await handleMemoryResource(this.env, uri);
-      } else {
-        throw new Error(`Unsupported resource URI: ${uri}`);
-      }
-    } catch (error) {
-      throw new Error(`Resource error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  /**
-   * List available resources
-   */
-  async getResources() {
-    const memoryResources = await listMemoryResources(this.env);
-    return [
-      memoryResource,
-      memoryTextResource,
-      ...memoryResources,
-    ];
-  }
-
-  /**
-   * Handle prompt requests
-   */
-  async handlePromptRequest(name: string, args: any = {}): Promise<any> {
-    try {
-      const promptContent = getWorkflowPrompt(name, args);
+  server.registerTool(
+    'get_memory',
+    {
+      title: 'Get Memory',
+      description: 'Retrieve a specific memory by ID',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Memory ID to retrieve',
+          },
+        },
+        required: ['id'],
+      },
+    },
+    async (args) => {
+      const result = await handleGetMemory(env, args);
       return {
-        description: `Generated ${name} workflow prompt`,
-        messages: [
-          {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'list_memories',
+    {
+      title: 'List Memories',
+      description: 'List all memories with optional filtering and pagination',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: {
+            type: 'number',
+            description: 'Maximum number of memories to return',
+            default: 10,
+          },
+          offset: {
+            type: 'number',
+            description: 'Number of memories to skip',
+            default: 0,
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Filter by tags',
+          },
+        },
+      },
+    },
+    async (args) => {
+      const result = await handleListMemories(env, args);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'delete_memory',
+    {
+      title: 'Delete Memory',
+      description: 'Delete a specific memory by ID',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Memory ID to delete',
+          },
+        },
+        required: ['id'],
+      },
+    },
+    async (args) => {
+      const result = await handleDeleteMemory(env, args);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'update_url_content',
+    {
+      title: 'Update URL Content',
+      description: 'Update content of memories by fetching from their URLs',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Memory ID to update (optional, updates all if not provided)',
+          },
+        },
+      },
+    },
+    async (args) => {
+      const result = await handleUpdateUrlContent(env, args);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'find_memories',
+    {
+      title: 'Find Memories',
+      description: 'Search memories by content or tags with advanced filtering',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query for content',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags to filter by',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum number of results to return',
+            default: 10,
+          },
+          offset: {
+            type: 'number',
+            description: 'Number of results to skip',
+            default: 0,
+          },
+        },
+      },
+    },
+    async (args) => {
+      const result = await handleFindMemories(env, args);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'add_tags',
+    {
+      title: 'Add Tags',
+      description: 'Add tags to existing memories',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          memoryId: {
+            type: 'string',
+            description: 'Memory ID to add tags to',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags to add',
+          },
+        },
+        required: ['memoryId', 'tags'],
+      },
+    },
+    async (args) => {
+      const result = await handleAddTags(env, args);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  );
+
+  // Register resources
+  server.registerResource(
+    'memory://list',
+    {
+      title: 'Memory List',
+      description: 'List of all available memories',
+    },
+    async () => {
+      const resources = await listMemoryResources(env);
+      return {
+        contents: [{
+          uri: 'memory://list',
+          text: JSON.stringify(resources, null, 2),
+          mimeType: 'application/json'
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    'memory://*',
+    {
+      title: 'Memory Resource',
+      description: 'Individual memory resources by ID',
+    },
+    async (uri) => {
+      const result = await handleMemoryResource(env, uri);
+      return {
+        contents: [{
+          uri,
+          text: JSON.stringify(result, null, 2),
+          mimeType: 'application/json'
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    'memory://*/text',
+    {
+      title: 'Memory Text Resource',
+      description: 'Text content of memory resources',
+    },
+    async (uri) => {
+      const result = await handleMemoryTextResource(env, uri);
+      return {
+        contents: [{
+          uri,
+          text: typeof result === 'string' ? result : JSON.stringify(result),
+          mimeType: 'text/plain'
+        }]
+      };
+    }
+  );
+
+  // Register prompts
+  availableWorkflowPrompts.forEach(prompt => {
+    server.registerPrompt(
+      prompt.name,
+      {
+        title: prompt.title,
+        description: prompt.description,
+        argsSchema: prompt.argsSchema,
+      },
+      (args) => {
+        const promptContent = getWorkflowPrompt(prompt.name, args);
+        return {
+          messages: [{
             role: 'user',
             content: {
               type: 'text',
               text: promptContent,
             },
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(`Prompt error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  /**
-   * List available prompts
-   */
-  getPrompts() {
-    return availableWorkflowPrompts;
-  }
-
-  /**
-   * Get server capabilities
-   */
-  getCapabilities() {
-    return {
-      tools: this.getTools(),
-      resources: [],
-      prompts: this.getPrompts(),
-    };
-  }
-
-  /**
-   * Handle HTTP requests for MCP operations
-   */
-  async handleHttpRequest(request: Request): Promise<Response> {
-    try {
-      // Handle CORS preflight
-      if (request.method === 'OPTIONS') {
-        return new Response(null, {
-          status: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
-        });
+          }],
+        };
       }
+    );
+  });
 
-      // Handle GET requests - basic server info
-      if (request.method === 'GET') {
-        return new Response(
-          JSON.stringify({
-            name: 'memory-server-mcp',
-            version: '1.0.0',
-            capabilities: {
-              tools: this.getTools().length,
-              resources: true,
-              prompts: this.getPrompts().length,
-            },
-            tools: this.getTools().map(tool => ({ name: tool.name, description: tool.description })),
-            endpoints: {
-              tools: '/mcp/tools',
-              resources: '/mcp/resources',
-              prompts: '/mcp/prompts',
-            },
-          }),
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-          }
-        );
+  return server;
+}
+
+
+/**
+ * Create HTTP handler for MCP server using Streamable HTTP transport
+ */
+export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
+  try {
+    const server = createMCPMemoryServer(env);
+    const transport = new CloudflareStreamableHttpTransport(server, env);
+    
+    return await transport.handleRequest(request);
+
+  } catch (error) {
+    console.error('MCP HTTP request error:', error);
+    return new Response(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal error',
+          data: error instanceof Error ? error.message : String(error),
+        },
+      }),
+      {
+        status: 500,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
       }
-
-      // Handle POST requests - MCP operations
-      if (request.method === 'POST') {
-        const body = await request.json();
-        const { method, params } = body;
-
-        let result;
-        switch (method) {
-          case 'tools/list':
-            result = { tools: this.getTools() };
-            break;
-          case 'tools/call':
-            result = await this.handleToolCall(params.name, params.arguments);
-            break;
-          case 'resources/list':
-            result = { resources: await this.getResources() };
-            break;
-          case 'resources/read':
-            result = await this.handleResourceRequest(params.uri);
-            break;
-          case 'prompts/list':
-            result = { prompts: this.getPrompts() };
-            break;
-          case 'prompts/get':
-            result = await this.handlePromptRequest(params.name, params.arguments);
-            break;
-          default:
-            throw new Error(`Unknown method: ${method}`);
-        }
-
-        return new Response(
-          JSON.stringify({
-            jsonrpc: '2.0',
-            id: body.id || null,
-            result,
-          }),
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-          }
-        );
-      }
-
-      return new Response('Method not allowed', { status: 405 });
-
-    } catch (error) {
-      console.error('MCP HTTP request error:', error);
-      return new Response(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          error: {
-            code: -32603,
-            message: 'Internal error',
-            data: error instanceof Error ? error.message : String(error),
-          },
-        }),
-        {
-          status: 500,
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
-      );
-    }
+    );
   }
 }
