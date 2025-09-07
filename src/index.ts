@@ -2,9 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
-
-// TODO: Import MCP server handlers
-// TODO: Import database handlers
+import { handleMCPHttpRequest } from './mcp/server';
 
 export interface Env {
   DB: D1Database;
@@ -44,5 +42,35 @@ app.get('/api/memories/:id', memoryHandlers.getMemory);
 app.put('/api/memories/:id', memoryHandlers.updateMemory);
 app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
 
-// TODO: Add MCP server endpoints
+// MCP endpoint
+app.all('/mcp', async (c) => {
+  try {
+    return await handleMCPHttpRequest(c.env, c.req.raw);
+  } catch (error) {
+    console.error('MCP endpoint error:', error);
+    return c.json({
+      error: 'MCP server error',
+      message: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// Health check for MCP
+app.get('/mcp/health', (c) => {
+  return c.json({
+    mcp: 'ready',
+    version: '1.0.0',
+    capabilities: ['tools', 'resources', 'prompts'],
+    tools: [
+      'add_memory',
+      'get_memory', 
+      'list_memories',
+      'delete_memory',
+      'find_memories',
+      'add_tags',
+      'update_url_content'
+    ]
+  });
+});
+
 export default app;
