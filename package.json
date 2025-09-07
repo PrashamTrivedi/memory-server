@@ -15,7 +15,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@hono/node-server": "^1.8.0",

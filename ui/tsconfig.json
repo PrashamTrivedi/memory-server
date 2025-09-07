@@ -16,6 +16,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "worker-configuration.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

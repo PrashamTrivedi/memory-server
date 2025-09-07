@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit",
     "worker:dev": "npm run build && wrangler dev --env development",
     "worker:deploy": "npm run build && wrangler deploy",
-    "worker:build": "wrangler deploy --dry-run"
+    "worker:build": "wrangler deploy --dry-run",
+    "worker:cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",

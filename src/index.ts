@@ -4,11 +4,6 @@ import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
 import { handleMCPHttpRequest } from './mcp/server';
 
-export interface Env {
-  DB: D1Database;
-  CACHE_KV: KVNamespace;
-  BROWSER: Fetcher;
-}
 
 const app = new Hono<{ Bindings: Env }>();
 

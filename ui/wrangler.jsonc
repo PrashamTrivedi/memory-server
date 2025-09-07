@@ -3,14 +3,22 @@
   "main": "src/worker.ts",
   "compatibility_date": "2025-08-15",
   "compatibility_flags": [
-    "nodejs_compat"
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "services": [
+    {
+      "binding": "API_SERVICE",
+      "service": "memory-server"
+    }
   ],
   "observability": {
     "enabled": true
   },
   "assets": {
     "directory": "../dist/ui",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
   },
   "vars": {
     "ENVIRONMENT": "production",
