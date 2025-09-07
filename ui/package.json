@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
-    "worker:dev": "wrangler dev --env development",
+    "worker:dev": "npm run build && wrangler dev --env development",
     "worker:deploy": "npm run build && wrangler deploy",
     "worker:build": "wrangler deploy --dry-run"
   },
