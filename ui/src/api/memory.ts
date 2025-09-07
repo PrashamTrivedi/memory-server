@@ -106,7 +106,7 @@ class MemoryApiClient {
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to search memories');
     }
-    return data.data;
+    return data.data || [];
   }
 
   async getMemoryStats(): Promise<MemoryStats> {
