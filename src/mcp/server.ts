@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
 import type { Env } from '../index.js';
-import { CloudflareStreamableHttpTransport } from './transport/streamableHttp.js';
 
 // Tool handlers
 import {
@@ -45,28 +46,10 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Add Memory',
       description: 'Add a new memory to the server with optional URL content fetching',
       inputSchema: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description: 'Name or title of the memory',
-          },
-          content: {
-            type: 'string',
-            description: 'Content of the memory',
-          },
-          url: {
-            type: 'string',
-            description: 'Optional URL to fetch content from',
-            format: 'uri',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Optional tags to associate with the memory',
-          },
-        },
-        required: ['name', 'content'],
+        name: z.string().describe('Name or title of the memory'),
+        content: z.string().describe('Content of the memory'),
+        url: z.string().optional().describe('Optional URL to fetch content from'),
+        tags: z.array(z.string()).optional().describe('Optional tags to associate with the memory'),
       },
     },
     async (args) => {
@@ -86,14 +69,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Get Memory',
       description: 'Retrieve a specific memory by ID',
       inputSchema: {
-        type: 'object',
-        properties: {
-          id: {
-            type: 'string',
-            description: 'Memory ID to retrieve',
-          },
-        },
-        required: ['id'],
+        id: z.string().describe('Memory ID to retrieve'),
       },
     },
     async (args) => {
@@ -113,24 +89,9 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'List Memories',
       description: 'List all memories with optional filtering and pagination',
       inputSchema: {
-        type: 'object',
-        properties: {
-          limit: {
-            type: 'number',
-            description: 'Maximum number of memories to return',
-            default: 10,
-          },
-          offset: {
-            type: 'number',
-            description: 'Number of memories to skip',
-            default: 0,
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Filter by tags',
-          },
-        },
+        limit: z.number().optional().describe('Maximum number of memories to return'),
+        offset: z.number().optional().describe('Number of memories to skip'),
+        tags: z.array(z.string()).optional().describe('Filter by tags'),
       },
     },
     async (args) => {
@@ -150,14 +111,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Delete Memory',
       description: 'Delete a specific memory by ID',
       inputSchema: {
-        type: 'object',
-        properties: {
-          id: {
-            type: 'string',
-            description: 'Memory ID to delete',
-          },
-        },
-        required: ['id'],
+        id: z.string().describe('Memory ID to delete'),
       },
     },
     async (args) => {
@@ -177,13 +131,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Update URL Content',
       description: 'Update content of memories by fetching from their URLs',
       inputSchema: {
-        type: 'object',
-        properties: {
-          id: {
-            type: 'string',
-            description: 'Memory ID to update (optional, updates all if not provided)',
-          },
-        },
+        id: z.string().optional().describe('Memory ID to update (optional, updates all if not provided)'),
       },
     },
     async (args) => {
@@ -203,28 +151,10 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Find Memories',
       description: 'Search memories by content or tags with advanced filtering',
       inputSchema: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Search query for content',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Tags to filter by',
-          },
-          limit: {
-            type: 'number',
-            description: 'Maximum number of results to return',
-            default: 10,
-          },
-          offset: {
-            type: 'number',
-            description: 'Number of results to skip',
-            default: 0,
-          },
-        },
+        query: z.string().optional().describe('Search query for content'),
+        tags: z.array(z.string()).optional().describe('Tags to filter by'),
+        limit: z.number().optional().describe('Maximum number of results to return'),
+        offset: z.number().optional().describe('Number of results to skip'),
       },
     },
     async (args) => {
@@ -244,19 +174,8 @@ export function createMCPMemoryServer(env: Env): McpServer {
       title: 'Add Tags',
       description: 'Add tags to existing memories',
       inputSchema: {
-        type: 'object',
-        properties: {
-          memoryId: {
-            type: 'string',
-            description: 'Memory ID to add tags to',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Tags to add',
-          },
-        },
-        required: ['memoryId', 'tags'],
+        memoryId: z.string().describe('Memory ID to add tags to'),
+        tags: z.array(z.string()).describe('Tags to add'),
       },
     },
     async (args) => {
@@ -272,10 +191,12 @@ export function createMCPMemoryServer(env: Env): McpServer {
 
   // Register resources
   server.registerResource(
+    'memory-list',
     'memory://list',
     {
       title: 'Memory List',
       description: 'List of all available memories',
+      mimeType: 'application/json'
     },
     async () => {
       const resources = await listMemoryResources(env);
@@ -290,16 +211,18 @@ export function createMCPMemoryServer(env: Env): McpServer {
   );
 
   server.registerResource(
+    'memory-individual',
     'memory://*',
     {
       title: 'Memory Resource',
       description: 'Individual memory resources by ID',
+      mimeType: 'application/json'
     },
-    async (uri) => {
-      const result = await handleMemoryResource(env, uri);
+    async (uri: URL) => {
+      const result = await handleMemoryResource(env, uri.toString());
       return {
         contents: [{
-          uri,
+          uri: uri.toString(),
           text: JSON.stringify(result, null, 2),
           mimeType: 'application/json'
         }]
@@ -308,16 +231,18 @@ export function createMCPMemoryServer(env: Env): McpServer {
   );
 
   server.registerResource(
+    'memory-text',
     'memory://*/text',
     {
       title: 'Memory Text Resource',
       description: 'Text content of memory resources',
+      mimeType: 'text/plain'
     },
-    async (uri) => {
-      const result = await handleMemoryTextResource(env, uri);
+    async (uri: URL) => {
+      const result = await handleMemoryTextResource(env, uri.toString());
       return {
         contents: [{
-          uri,
+          uri: uri.toString(),
           text: typeof result === 'string' ? result : JSON.stringify(result),
           mimeType: 'text/plain'
         }]
@@ -327,14 +252,26 @@ export function createMCPMemoryServer(env: Env): McpServer {
 
   // Register prompts
   availableWorkflowPrompts.forEach(prompt => {
+    // Convert arguments to zod schema
+    const argsSchema: Record<string, any> = {};
+    if (prompt.arguments) {
+      for (const arg of prompt.arguments) {
+        if (arg.required) {
+          argsSchema[arg.name] = z.string().describe(arg.description);
+        } else {
+          argsSchema[arg.name] = z.string().optional().describe(arg.description);
+        }
+      }
+    }
+
     server.registerPrompt(
       prompt.name,
       {
-        title: prompt.title,
+        title: prompt.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         description: prompt.description,
-        argsSchema: prompt.argsSchema,
+        argsSchema: argsSchema,
       },
-      (args) => {
+      (args: any) => {
         const promptContent = getWorkflowPrompt(prompt.name, args);
         return {
           messages: [{
@@ -353,15 +290,106 @@ export function createMCPMemoryServer(env: Env): McpServer {
 }
 
 
+// Map to store transports by session ID for Cloudflare Workers
+const transports = new Map<string, StreamableHTTPServerTransport>();
+
 /**
- * Create HTTP handler for MCP server using Streamable HTTP transport
+ * Create HTTP handler for MCP server using official SDK Streamable HTTP transport
  */
 export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
   try {
-    const server = createMCPMemoryServer(env);
-    const transport = new CloudflareStreamableHttpTransport(server, env);
+    const sessionId = request.headers.get('mcp-session-id');
     
-    return await transport.handleRequest(request);
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
+        },
+      });
+    }
+
+    let transport: StreamableHTTPServerTransport;
+
+    if (sessionId && transports.has(sessionId)) {
+      // Reuse existing transport
+      transport = transports.get(sessionId)!;
+    } else {
+      // Create new transport for new sessions or initialization
+      const server = createMCPMemoryServer(env);
+      
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+        onsessioninitialized: (newSessionId: string) => {
+          console.log(`Session initialized with ID: ${newSessionId}`);
+          transports.set(newSessionId, transport);
+        }
+      });
+
+      // Set up onclose handler to clean up transport
+      transport.onclose = () => {
+        const sid = transport.sessionId;
+        if (sid && transports.has(sid)) {
+          console.log(`Transport closed for session ${sid}`);
+          transports.delete(sid);
+        }
+      };
+
+      // Connect the transport to the MCP server
+      await server.connect(transport);
+    }
+
+    // Convert Cloudflare Request to Node.js-like request object
+    const body = request.method === 'POST' ? await request.json() : null;
+    
+    // Create a mock Express-like request and response
+    const mockReq = {
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries()),
+      body: body
+    };
+
+    let responseData: any = null;
+    let statusCode = 200;
+    let responseHeaders: Record<string, string> = {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/json'
+    };
+
+    const mockRes = {
+      status: (code: number) => {
+        statusCode = code;
+        return mockRes;
+      },
+      json: (data: any) => {
+        responseData = data;
+        return mockRes;
+      },
+      setHeader: (name: string, value: string) => {
+        responseHeaders[name] = value;
+        return mockRes;
+      },
+      send: (data: any) => {
+        responseData = data;
+        return mockRes;
+      },
+      headersSent: false
+    };
+
+    // Handle the request using the official SDK transport
+    await transport.handleRequest(mockReq as any, mockRes as any, body);
+
+    // Return the response
+    return new Response(
+      typeof responseData === 'string' ? responseData : JSON.stringify(responseData),
+      {
+        status: statusCode,
+        headers: responseHeaders,
+      }
+    );
 
   } catch (error) {
     console.error('MCP HTTP request error:', error);
