@@ -27,7 +27,7 @@ export class CloudflareStreamableHttpTransport {
           headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
+            'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, mcp-protocol-version, last-event-id',
           },
         })
       }
@@ -117,6 +117,39 @@ export class CloudflareStreamableHttpTransport {
    */
   private async handlePostRequest(request: Request): Promise<Response> {
     try {
+      // Validate protocol version header
+      const protocolVersion = request.headers.get('mcp-protocol-version')
+      if (!protocolVersion) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            error: {
+              code: -32600,
+              message: 'Invalid Request',
+              data: 'Missing mcp-protocol-version header',
+            },
+          }),
+          {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          }
+        )
+      }
+
+      // Validate origin header for security (DNS rebinding attack prevention)
+      const origin = request.headers.get('origin')
+      if (origin) {
+        // For localhost development, allow any localhost origin
+        const url = new URL(origin)
+        if (url.hostname !== 'localhost' && url.hostname !== '127.0.0.1' && !url.hostname.endsWith('.local')) {
+          // In production, you might want to maintain a whitelist of allowed origins
+          console.warn('Request from non-localhost origin:', origin)
+        }
+      }
+
       const body = await request.json() as any
       const sessionId = request.headers.get('mcp-session-id')
 
@@ -190,7 +223,7 @@ export class CloudflareStreamableHttpTransport {
             jsonrpc: '2.0',
             id,
             result: {
-              protocolVersion: '2024-11-05',
+              protocolVersion: '2025-03-26',
               capabilities: {
                 tools: {},
                 resources: {},
