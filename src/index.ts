@@ -42,7 +42,7 @@ app.get('/api/memories/:id', memoryHandlers.getMemory);
 app.put('/api/memories/:id', memoryHandlers.updateMemory);
 app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
 
-// MCP endpoint
+// MCP endpoint - supports all MCP operations
 app.all('/mcp', async (c) => {
   try {
     return await handleMCPHttpRequest(c.env, c.req.raw);
@@ -55,12 +55,36 @@ app.all('/mcp', async (c) => {
   }
 });
 
-// Health check for MCP
+// Agent SDK enhanced endpoints
+app.get('/mcp/agent/capabilities', async (c) => {
+  try {
+    return await handleMCPHttpRequest(c.env, c.req.raw);
+  } catch (error) {
+    console.error('Agent capabilities error:', error);
+    return c.json({ error: 'Agent capabilities error' }, 500);
+  }
+});
+
+app.get('/mcp/agent/config', async (c) => {
+  try {
+    return await handleMCPHttpRequest(c.env, c.req.raw);
+  } catch (error) {
+    console.error('Agent config error:', error);
+    return c.json({ error: 'Agent config error' }, 500);
+  }
+});
+
+// Health check for MCP with agent support
 app.get('/mcp/health', (c) => {
   return c.json({
     mcp: 'ready',
     version: '1.0.0',
     capabilities: ['tools', 'resources', 'prompts'],
+    agentSdk: {
+      enabled: true,
+      version: '1.0.0',
+      features: ['batch-requests', 'session-management', 'capabilities-negotiation']
+    },
     tools: [
       'add_memory',
       'get_memory', 
@@ -69,7 +93,13 @@ app.get('/mcp/health', (c) => {
       'find_memories',
       'add_tags',
       'update_url_content'
-    ]
+    ],
+    endpoints: {
+      mcp: '/mcp',
+      capabilities: '/mcp/agent/capabilities',
+      config: '/mcp/agent/config',
+      health: '/mcp/health'
+    }
   });
 });
 

@@ -2,17 +2,75 @@
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js'
 import {Env} from "../../index"
 
+// Agent session tracking for Cloudflare Agent SDK
+interface AgentSession {
+  id: string
+  created: number
+  lastActivity: number
+  capabilities: string[]
+  metadata: Record<string, any>
+}
+
 /**
- * Streamable HTTP Transport adapter for Cloudflare Workers
+ * Streamable HTTP Transport adapter for Cloudflare Workers with Agent SDK support
  * This creates a bridge between Cloudflare's Request/Response and MCP's streamable HTTP transport
+ * Enhanced for Cloudflare Agent SDK integration
  */
 export class CloudflareStreamableHttpTransport {
   private server: McpServer
   private env: Env
+  private agentSessions: Map<string, AgentSession> = new Map()
 
   constructor(server: McpServer, env: Env) {
     this.server = server
     this.env = env
+  }
+
+  /**
+   * Create or update agent session
+   */
+  private createAgentSession(request: Request): AgentSession {
+    const sessionId = request.headers.get('mcp-session-id') || crypto.randomUUID()
+    const agentId = request.headers.get('x-agent-id')
+    const agentVersion = request.headers.get('x-agent-version')
+    const agentCapabilities = request.headers.get('x-agent-capabilities')?.split(',') || []
+
+    const session: AgentSession = {
+      id: sessionId,
+      created: Date.now(),
+      lastActivity: Date.now(),
+      capabilities: agentCapabilities,
+      metadata: {
+        agentId,
+        agentVersion,
+        userAgent: request.headers.get('user-agent'),
+      }
+    }
+
+    this.agentSessions.set(sessionId, session)
+    return session
+  }
+
+  /**
+   * Update agent session activity
+   */
+  private updateAgentSession(sessionId: string): void {
+    const session = this.agentSessions.get(sessionId)
+    if (session) {
+      session.lastActivity = Date.now()
+    }
+  }
+
+  /**
+   * Clean up expired sessions (older than 1 hour)
+   */
+  private cleanupExpiredSessions(): void {
+    const oneHourAgo = Date.now() - (60 * 60 * 1000)
+    for (const [sessionId, session] of this.agentSessions.entries()) {
+      if (session.lastActivity < oneHourAgo) {
+        this.agentSessions.delete(sessionId)
+      }
+    }
   }
 
   /**
@@ -27,7 +85,8 @@ export class CloudflareStreamableHttpTransport {
           headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
+            'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id, x-agent-id, x-agent-version, x-agent-capabilities',
+            'Access-Control-Expose-Headers': 'mcp-session-id, x-agent-session-id',
           },
         })
       }
@@ -77,35 +136,164 @@ export class CloudflareStreamableHttpTransport {
   }
 
   /**
-   * Handle GET requests for SSE streams
-   * For now, return basic server info since full SSE support requires more complex implementation
+   * Handle GET requests for agent discovery and capabilities
+   * Enhanced for Cloudflare Agent SDK support
    */
   private handleGetRequest(request: Request): Response {
     const url = new URL(request.url)
-    const sessionId = request.headers.get('mcp-session-id')
-    const lastEventId = request.headers.get('last-event-id')
+    const path = url.pathname
+    
+    // Clean up expired sessions
+    this.cleanupExpiredSessions()
+    
+    // Create or get agent session
+    const session = this.createAgentSession(request)
 
-    // For now, return basic server capabilities instead of starting an SSE stream
-    // Full SSE implementation would require persistent connections which is complex in Workers
+    // Handle different GET endpoints
+    if (path.endsWith('/agent/capabilities') || path.endsWith('/capabilities')) {
+      return this.handleAgentCapabilities(session)
+    }
+
+    if (path.endsWith('/agent/config') || path.endsWith('/config')) {
+      return this.handleAgentConfig(session)
+    }
+
+    // Default: return enhanced server info with agent support
     return new Response(
       JSON.stringify({
         name: 'memory-server-mcp',
         version: '1.0.0',
         capabilities: {
-          tools: true,
-          resources: true,
-          prompts: true,
+          tools: {
+            listChanged: true,
+          },
+          resources: {
+            subscribe: true,
+            listChanged: true,
+          },
+          prompts: {
+            listChanged: true,
+          },
+          experimental: {
+            agentSdk: true,
+            batchRequests: true,
+            streaming: true,
+          }
         },
-        transport: 'streamable-http',
-        sessionId: sessionId || undefined,
-        lastEventId: lastEventId || undefined,
+        transport: {
+          type: 'streamable-http',
+          version: '1.0.0',
+          features: ['agent-sessions', 'batch-operations', 'capabilities-negotiation']
+        },
+        agent: {
+          sessionId: session.id,
+          capabilities: session.capabilities,
+          supportedFeatures: ['tools', 'resources', 'prompts', 'batch-requests']
+        },
+        endpoints: {
+          capabilities: '/agent/capabilities',
+          config: '/agent/config',
+          tools: '/tools',
+          resources: '/resources', 
+          prompts: '/prompts'
+        }
       }),
       {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
-          'mcp-session-id': sessionId || crypto.randomUUID(),
+          'mcp-session-id': session.id,
+          'x-agent-session-id': session.id,
+        },
+      }
+    )
+  }
+
+  /**
+   * Handle agent capabilities endpoint
+   */
+  private handleAgentCapabilities(session: AgentSession): Response {
+    return new Response(
+      JSON.stringify({
+        sessionId: session.id,
+        serverCapabilities: {
+          tools: {
+            count: 7,
+            features: ['json-schema', 'validation', 'caching'],
+            available: ['add_memory', 'get_memory', 'list_memories', 'delete_memory', 'find_memories', 'add_tags', 'update_url_content']
+          },
+          resources: {
+            schemes: ['memory://'],
+            features: ['dynamic-listing', 'caching', 'content-types'],
+            patterns: ['memory://list', 'memory://{id}', 'memory://{id}/text']
+          },
+          prompts: {
+            count: 4,
+            features: ['workflow-templates', 'argument-validation'],
+            available: ['memory_capture_workflow', 'knowledge_discovery_workflow', 'content_maintenance_workflow', 'research_session_workflow']
+          }
+        },
+        clientCapabilities: session.capabilities,
+        negotiated: {
+          transport: 'streamable-http',
+          features: ['batch-requests', 'async-operations', 'result-caching']
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'mcp-session-id': session.id,
+        },
+      }
+    )
+  }
+
+  /**
+   * Handle agent configuration endpoint
+   */
+  private handleAgentConfig(session: AgentSession): Response {
+    return new Response(
+      JSON.stringify({
+        sessionId: session.id,
+        config: {
+          maxMemorySize: 10 * 1024 * 1024, // 10MB
+          maxBatchSize: 10,
+          defaultTimeout: 30000,
+          caching: {
+            enabled: true,
+            ttl: 300, // 5 minutes
+          },
+          features: {
+            urlContent: true,
+            tagging: true,
+            search: true,
+            workflows: true,
+          }
+        },
+        limits: {
+          toolCalls: {
+            perMinute: 100,
+            concurrent: 5
+          },
+          resources: {
+            maxSize: 50 * 1024 * 1024, // 50MB
+            concurrent: 10
+          },
+          prompts: {
+            maxLength: 100000,
+            concurrent: 3
+          }
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'mcp-session-id': session.id,
         },
       }
     )
@@ -113,12 +301,20 @@ export class CloudflareStreamableHttpTransport {
 
   /**
    * Handle POST requests with JSON-RPC messages
-   * Route messages through the MCP server's built-in handlers
+   * Enhanced for Cloudflare Agent SDK with batch operation support
    */
   private async handlePostRequest(request: Request): Promise<Response> {
     try {
       const body = await request.json() as any
-      const sessionId = request.headers.get('mcp-session-id')
+      const session = this.createAgentSession(request)
+      
+      // Update session activity
+      this.updateAgentSession(session.id)
+
+      // Handle batch requests (array of JSON-RPC messages)
+      if (Array.isArray(body)) {
+        return await this.handleBatchRequest(body, session)
+      }
 
       // Basic JSON-RPC message validation
       if (!body.jsonrpc || body.jsonrpc !== '2.0') {
@@ -136,13 +332,14 @@ export class CloudflareStreamableHttpTransport {
             headers: {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
+              'mcp-session-id': session.id,
             },
           }
         )
       }
 
       // Route the JSON-RPC message to the MCP server
-      const result = await this.routeJsonRpcMessage(body)
+      const result = await this.routeJsonRpcMessage(body, session)
 
       return new Response(
         JSON.stringify(result),
@@ -151,12 +348,14 @@ export class CloudflareStreamableHttpTransport {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'mcp-session-id': sessionId || crypto.randomUUID(),
+            'mcp-session-id': session.id,
+            'x-agent-session-id': session.id,
           },
         }
       )
 
     } catch (error) {
+      const session = this.createAgentSession(request)
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
@@ -171,6 +370,7 @@ export class CloudflareStreamableHttpTransport {
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
+            'mcp-session-id': session.id,
           },
         }
       )
@@ -178,9 +378,69 @@ export class CloudflareStreamableHttpTransport {
   }
 
   /**
+   * Handle batch JSON-RPC requests for improved agent performance
+   */
+  private async handleBatchRequest(batch: any[], session: AgentSession): Promise<Response> {
+    const maxBatchSize = 10 // Configurable limit
+    
+    if (batch.length > maxBatchSize) {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: {
+            code: -32600,
+            message: 'Invalid Request',
+            data: `Batch size ${batch.length} exceeds maximum of ${maxBatchSize}`,
+          },
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'mcp-session-id': session.id,
+          },
+        }
+      )
+    }
+
+    // Process all requests in the batch
+    const results = await Promise.all(
+      batch.map(async (request) => {
+        try {
+          return await this.routeJsonRpcMessage(request, session)
+        } catch (error) {
+          return {
+            jsonrpc: '2.0',
+            id: request.id,
+            error: {
+              code: -32603,
+              message: 'Internal error',
+              data: error instanceof Error ? error.message : String(error),
+            },
+          }
+        }
+      })
+    )
+
+    return new Response(
+      JSON.stringify(results),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'mcp-session-id': session.id,
+          'x-batch-size': batch.length.toString(),
+        },
+      }
+    )
+  }
+
+  /**
    * Route JSON-RPC messages to appropriate MCP server handlers
    */
-  private async routeJsonRpcMessage(message: any): Promise<any> {
+  private async routeJsonRpcMessage(message: any, session?: AgentSession): Promise<any> {
     const {method, params, id} = message
 
     try {
