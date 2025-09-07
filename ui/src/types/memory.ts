@@ -47,3 +47,12 @@ export interface MemoryStats {
   recent: number;
   tagged: number;
 }
+
+export interface SearchMemoryResponse {
+  memories: Memory[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
