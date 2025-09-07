@@ -5,6 +5,7 @@ import {
   UpdateMemoryRequest,
   MemoryListResponse,
   SearchMemoryRequest,
+  SearchMemoryResponse,
   ApiResponse,
   MemoryStats
 } from '../types/memory';
@@ -85,7 +86,7 @@ class MemoryApiClient {
     }
   }
 
-  async searchMemories(request: SearchMemoryRequest): Promise<Memory[]> {
+  async searchMemories(request: SearchMemoryRequest): Promise<SearchMemoryResponse> {
     const params = new URLSearchParams();
     params.append('query', request.query);
     if (request.tags && request.tags.length > 0) {
@@ -102,7 +103,7 @@ class MemoryApiClient {
     if (!response.ok) {
       throw new Error(`Failed to search memories: ${response.statusText}`);
     }
-    const data: ApiResponse<Memory[]> = await response.json();
+    const data: ApiResponse<SearchMemoryResponse> = await response.json();
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to search memories');
     }

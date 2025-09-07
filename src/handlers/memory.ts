@@ -519,9 +519,40 @@ async function getOrCreateTag(db: D1Database, tagName: string): Promise<number> 
 }
 
 /**
+ * Process search query to support partial word matching
+ * Adds wildcards to each word to enable prefix search
+ */
+function processSearchQuery(query: string): string {
+  // Split query into words and process each
+  const words = query.trim().split(/\s+/);
+  
+  // Add wildcard to each word for prefix matching
+  // Also escape special FTS5 characters
+  const processedWords = words.map(word => {
+    // Remove existing wildcards to avoid double wildcarding
+    const cleanWord = word.replace(/\*/g, '');
+    
+    // Skip empty words
+    if (!cleanWord) return '';
+    
+    // Escape special FTS5 characters (quotes)
+    const escapedWord = cleanWord.replace(/"/g, '""');
+    
+    // Add wildcard for prefix matching
+    return `${escapedWord}*`;
+  }).filter(Boolean);
+  
+  // Join with spaces for FTS5 query
+  return processedWords.join(' ');
+}
+
+/**
  * Search memories by query using FTS
  */
 async function searchMemoriesByQuery(db: D1Database, query: string, limit: number, offset: number) {
+  // Process query to support partial word matching
+  const processedQuery = processSearchQuery(query);
+  
   const stmt = db.prepare(`
     SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
@@ -531,14 +562,14 @@ async function searchMemoriesByQuery(db: D1Database, query: string, limit: numbe
     LIMIT ? OFFSET ?
   `);
   
-  const result = await stmt.bind(query, limit, offset).all<MemoryRow>();
+  const result = await stmt.bind(processedQuery, limit, offset).all<MemoryRow>();
   
   // Get total count
   const countResult = await db.prepare(`
     SELECT COUNT(*) as count
     FROM memories_fts
     WHERE memories_fts MATCH ?
-  `).bind(query).first<{ count: number }>();
+  `).bind(processedQuery).first<{ count: number }>();
   
   const memories: Memory[] = [];
   for (const row of result.results || []) {
@@ -619,6 +650,9 @@ async function searchMemoriesByTags(db: D1Database, tagNames: string[], limit: n
 async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNames: string[], limit: number, offset: number) {
   const placeholders = tagNames.map(() => '?').join(',');
   
+  // Process query to support partial word matching
+  const processedQuery = processSearchQuery(query);
+  
   const stmt = db.prepare(`
     SELECT DISTINCT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
@@ -632,7 +666,7 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     LIMIT ? OFFSET ?
   `);
   
-  const result = await stmt.bind(query, ...tagNames, tagNames.length, limit, offset).all<MemoryRow>();
+  const result = await stmt.bind(processedQuery, ...tagNames, tagNames.length, limit, offset).all<MemoryRow>();
   
   // Get total count
   const countStmt = db.prepare(`
@@ -646,7 +680,7 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     HAVING COUNT(DISTINCT t.id) = ?
   `);
   
-  const countResult = await countStmt.bind(query, ...tagNames, tagNames.length).first<{ count: number }>();
+  const countResult = await countStmt.bind(processedQuery, ...tagNames, tagNames.length).first<{ count: number }>();
   
   const memories: Memory[] = [];
   for (const row of result.results || []) {

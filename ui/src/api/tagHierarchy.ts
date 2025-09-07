@@ -111,7 +111,7 @@ export class TagHierarchyApi {
       }
 
       const data: AncestorsResponse = await response.json();
-      return data.ancestors;
+      return data.ancestors || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -138,7 +138,7 @@ export class TagHierarchyApi {
       }
 
       const data: DescendantsResponse = await response.json();
-      return data.descendants;
+      return data.descendants || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -169,7 +169,7 @@ export class TagHierarchyApi {
         throw new TagHierarchyApiError(data.error || 'Failed to fetch parents');
       }
 
-      return data.data.parents;
+      return data.data.parents || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -200,7 +200,7 @@ export class TagHierarchyApi {
         throw new TagHierarchyApiError(data.error || 'Failed to fetch children');
       }
 
-      return data.data.children;
+      return data.data.children || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -227,7 +227,7 @@ export class TagHierarchyApi {
       }
 
       const data: TagTreeResponse = await response.json();
-      return data.tree;
+      return data.tree || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
