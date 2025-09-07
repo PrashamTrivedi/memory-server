@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { toReqRes, toFetchResponse } from 'fetch-to-node';
 import type { Env } from '../index.js';
 
 // Tool handlers
@@ -295,6 +296,7 @@ const transports = new Map<string, StreamableHTTPServerTransport>();
 
 /**
  * Create HTTP handler for MCP server using official SDK Streamable HTTP transport
+ * with fetch-to-node compatibility layer
  */
 export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
   try {
@@ -342,54 +344,27 @@ export async function handleMCPHttpRequest(env: Env, request: Request): Promise<
       await server.connect(transport);
     }
 
-    // Convert Cloudflare Request to Node.js-like request object
-    const body = request.method === 'POST' ? await request.json() : null;
+    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
+    const { req, res } = toReqRes(request);
     
-    // Create a mock Express-like request and response
-    const mockReq = {
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries()),
-      body: body
-    };
-
-    let responseData: any = null;
-    let statusCode = 200;
-    let responseHeaders: Record<string, string> = {
-      'Access-Control-Allow-Origin': '*',
-      'Content-Type': 'application/json'
-    };
-
-    const mockRes = {
-      status: (code: number) => {
-        statusCode = code;
-        return mockRes;
-      },
-      json: (data: any) => {
-        responseData = data;
-        return mockRes;
-      },
-      setHeader: (name: string, value: string) => {
-        responseHeaders[name] = value;
-        return mockRes;
-      },
-      send: (data: any) => {
-        responseData = data;
-        return mockRes;
-      },
-      headersSent: false
-    };
+    // Read request body for POST requests
+    const body = request.method === 'POST' ? await request.json() : null;
 
     // Handle the request using the official SDK transport
-    await transport.handleRequest(mockReq as any, mockRes as any, body);
+    await transport.handleRequest(req, res, body);
 
-    // Return the response
-    return new Response(
-      typeof responseData === 'string' ? responseData : JSON.stringify(responseData),
-      {
-        status: statusCode,
-        headers: responseHeaders,
-      }
-    );
+    // Convert Node.js response back to Cloudflare Response
+    const fetchResponse = await toFetchResponse(res);
+    
+    // Add CORS headers
+    const headers = new Headers(fetchResponse.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
+    
+    return new Response(fetchResponse.body, {
+      status: fetchResponse.status,
+      statusText: fetchResponse.statusText,
+      headers: headers,
+    });
 
   } catch (error) {
     console.error('MCP HTTP request error:', error);
