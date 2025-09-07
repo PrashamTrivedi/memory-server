@@ -1,8 +1,8 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { z } from 'zod';
-import { toReqRes, toFetchResponse } from 'fetch-to-node';
-import type { Env } from '../index.js';
+import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js'
+import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import {z} from 'zod'
+import {toReqRes, toFetchResponse} from 'fetch-to-node'
+import type {Env} from '../index.js'
 
 // Tool handlers
 import {
@@ -11,25 +11,25 @@ import {
   handleListMemories,
   handleDeleteMemory,
   handleUpdateUrlContent,
-} from './tools/memory.js';
+} from './tools/memory.js'
 
 import {
   handleFindMemories,
   handleAddTags,
-} from './tools/search.js';
+} from './tools/search.js'
 
 // Resource handlers
 import {
   handleMemoryResource,
   handleMemoryTextResource,
   listMemoryResources,
-} from './resources/memory.js';
+} from './resources/memory.js'
 
 // Prompt handlers
 import {
   availableWorkflowPrompts,
   getWorkflowPrompt,
-} from './prompts/workflows.js';
+} from './prompts/workflows.js'
 
 /**
  * Create and configure MCP Memory Server using the official TypeScript SDK
@@ -38,7 +38,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
   const server = new McpServer({
     name: 'memory-server-mcp',
     version: '1.0.0',
-  });
+  })
 
   // Register memory management tools
   server.registerTool(
@@ -54,15 +54,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleAddMemory(env, args);
+      const result = await handleAddMemory(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'get_memory',
@@ -74,15 +74,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleGetMemory(env, args);
+      const result = await handleGetMemory(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'list_memories',
@@ -96,15 +96,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleListMemories(env, args);
+      const result = await handleListMemories(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'delete_memory',
@@ -116,15 +116,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleDeleteMemory(env, args);
+      const result = await handleDeleteMemory(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'update_url_content',
@@ -136,15 +136,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleUpdateUrlContent(env, args);
+      const result = await handleUpdateUrlContent(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'find_memories',
@@ -159,15 +159,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleFindMemories(env, args);
+      const result = await handleFindMemories(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerTool(
     'add_tags',
@@ -180,15 +180,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
       },
     },
     async (args) => {
-      const result = await handleAddTags(env, args);
+      const result = await handleAddTags(env, args)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify(result, null, 2)
         }]
-      };
+      }
     }
-  );
+  )
 
   // Register resources
   server.registerResource(
@@ -200,16 +200,16 @@ export function createMCPMemoryServer(env: Env): McpServer {
       mimeType: 'application/json'
     },
     async () => {
-      const resources = await listMemoryResources(env);
+      const resources = await listMemoryResources(env)
       return {
         contents: [{
           uri: 'memory://list',
           text: JSON.stringify(resources, null, 2),
           mimeType: 'application/json'
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerResource(
     'memory-individual',
@@ -220,16 +220,16 @@ export function createMCPMemoryServer(env: Env): McpServer {
       mimeType: 'application/json'
     },
     async (uri: URL) => {
-      const result = await handleMemoryResource(env, uri.toString());
+      const result = await handleMemoryResource(env, uri.toString())
       return {
         contents: [{
           uri: uri.toString(),
           text: JSON.stringify(result, null, 2),
           mimeType: 'application/json'
         }]
-      };
+      }
     }
-  );
+  )
 
   server.registerResource(
     'memory-text',
@@ -240,27 +240,27 @@ export function createMCPMemoryServer(env: Env): McpServer {
       mimeType: 'text/plain'
     },
     async (uri: URL) => {
-      const result = await handleMemoryTextResource(env, uri.toString());
+      const result = await handleMemoryTextResource(env, uri.toString())
       return {
         contents: [{
           uri: uri.toString(),
           text: typeof result === 'string' ? result : JSON.stringify(result),
           mimeType: 'text/plain'
         }]
-      };
+      }
     }
-  );
+  )
 
   // Register prompts
   availableWorkflowPrompts.forEach(prompt => {
     // Convert arguments to zod schema
-    const argsSchema: Record<string, any> = {};
+    const argsSchema: Record<string, any> = {}
     if (prompt.arguments) {
       for (const arg of prompt.arguments) {
         if (arg.required) {
-          argsSchema[arg.name] = z.string().describe(arg.description);
+          argsSchema[arg.name] = z.string().describe(arg.description)
         } else {
-          argsSchema[arg.name] = z.string().optional().describe(arg.description);
+          argsSchema[arg.name] = z.string().optional().describe(arg.description)
         }
       }
     }
@@ -273,7 +273,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
         argsSchema: argsSchema,
       },
       (args: any) => {
-        const promptContent = getWorkflowPrompt(prompt.name, args);
+        const promptContent = getWorkflowPrompt(prompt.name, args)
         return {
           messages: [{
             role: 'user',
@@ -282,17 +282,17 @@ export function createMCPMemoryServer(env: Env): McpServer {
               text: promptContent,
             },
           }],
-        };
+        }
       }
-    );
-  });
+    )
+  })
 
-  return server;
+  return server
 }
 
 
 // Map to store transports by session ID for Cloudflare Workers
-const transports = new Map<string, StreamableHTTPServerTransport>();
+const transports = new Map<string, StreamableHTTPServerTransport>()
 
 /**
  * Create HTTP handler for MCP server using official SDK Streamable HTTP transport
@@ -300,10 +300,10 @@ const transports = new Map<string, StreamableHTTPServerTransport>();
  */
 export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
   try {
-    const sessionId = request.headers.get('mcp-session-id');
-    
+    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
+    const {req, res} = toReqRes(request)
     // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
+    if (req.method === 'OPTIONS') {
       return new Response(null, {
         status: 200,
         headers: {
@@ -311,63 +311,54 @@ export async function handleMCPHttpRequest(env: Env, request: Request): Promise<
           'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
         },
-      });
+      })
     }
 
-    let transport: StreamableHTTPServerTransport;
+    let transport: StreamableHTTPServerTransport
 
-    if (sessionId && transports.has(sessionId)) {
-      // Reuse existing transport
-      transport = transports.get(sessionId)!;
-    } else {
-      // Create new transport for new sessions or initialization
-      const server = createMCPMemoryServer(env);
-      
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID(),
-        onsessioninitialized: (newSessionId: string) => {
-          console.log(`Session initialized with ID: ${newSessionId}`);
-          transports.set(newSessionId, transport);
-        }
-      });
 
-      // Set up onclose handler to clean up transport
-      transport.onclose = () => {
-        const sid = transport.sessionId;
-        if (sid && transports.has(sid)) {
-          console.log(`Transport closed for session ${sid}`);
-          transports.delete(sid);
-        }
-      };
+    transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    })
 
-      // Connect the transport to the MCP server
-      await server.connect(transport);
-    }
-
-    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
-    const { req, res } = toReqRes(request);
-    
+    const server = createMCPMemoryServer(env)
+    // Connect the transport to the MCP server
+    await server.connect(transport)
     // Read request body for POST requests
-    const body = request.method === 'POST' ? await request.json() : null;
+    const body = request.method === 'POST' ? await request.json() : null
 
     // Handle the request using the official SDK transport
-    await transport.handleRequest(req, res, body);
+    await transport.handleRequest(req, res, body)
+
+    // Set up onclose handler to clean up transport
+    transport.onclose = () => {
+      const sid = transport.sessionId
+      if (sid && transports.has(sid)) {
+        console.log(`Transport closed for session ${sid}`)
+        transports.delete(sid)
+      }
+    }
+
+
+
+
 
     // Convert Node.js response back to Cloudflare Response
-    const fetchResponse = await toFetchResponse(res);
-    
-    // Add CORS headers
-    const headers = new Headers(fetchResponse.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-    
-    return new Response(fetchResponse.body, {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      headers: headers,
-    });
+    const fetchResponse = await toFetchResponse(res)
+
+    // // Add CORS headers
+    // const headers = new Headers(fetchResponse.headers);
+    // headers.set('Access-Control-Allow-Origin', '*');
+
+    // return new Response(fetchResponse.body, {
+    //   status: fetchResponse.status,
+    //   statusText: fetchResponse.statusText,
+    //   headers: headers,
+    // });
+    return fetchResponse
 
   } catch (error) {
-    console.error('MCP HTTP request error:', error);
+    console.error('MCP HTTP request error:', error)
     return new Response(
       JSON.stringify({
         jsonrpc: '2.0',
@@ -379,11 +370,11 @@ export async function handleMCPHttpRequest(env: Env, request: Request): Promise<
       }),
       {
         status: 500,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
       }
-    );
+    )
   }
 }
