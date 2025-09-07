@@ -1,17 +1,18 @@
-import type { Env } from '../../index.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+
+import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js'
+import {Env} from "../../index"
 
 /**
  * Streamable HTTP Transport adapter for Cloudflare Workers
  * This creates a bridge between Cloudflare's Request/Response and MCP's streamable HTTP transport
  */
 export class CloudflareStreamableHttpTransport {
-  private server: McpServer;
-  private env: Env;
+  private server: McpServer
+  private env: Env
 
   constructor(server: McpServer, env: Env) {
-    this.server = server;
-    this.env = env;
+    this.server = server
+    this.env = env
   }
 
   /**
@@ -28,33 +29,33 @@ export class CloudflareStreamableHttpTransport {
             'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
           },
-        });
+        })
       }
 
       // Handle GET requests for SSE streams (basic implementation for now)
       if (request.method === 'GET') {
-        return this.handleGetRequest(request);
+        return this.handleGetRequest(request)
       }
 
       // Handle POST requests with JSON-RPC
       if (request.method === 'POST') {
-        return this.handlePostRequest(request);
+        return this.handlePostRequest(request)
       }
 
       // Handle DELETE requests for session termination
       if (request.method === 'DELETE') {
-        return this.handleDeleteRequest(request);
+        return this.handleDeleteRequest(request)
       }
 
-      return new Response('Method not allowed', { 
+      return new Response('Method not allowed', {
         status: 405,
         headers: {
           'Access-Control-Allow-Origin': '*',
         },
-      });
+      })
 
     } catch (error) {
-      console.error('Streamable HTTP transport error:', error);
+      console.error('Streamable HTTP transport error:', error)
       return new Response(
         JSON.stringify({
           jsonrpc: '2.0',
@@ -66,12 +67,12 @@ export class CloudflareStreamableHttpTransport {
         }),
         {
           status: 500,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
           },
         }
-      );
+      )
     }
   }
 
@@ -80,9 +81,9 @@ export class CloudflareStreamableHttpTransport {
    * For now, return basic server info since full SSE support requires more complex implementation
    */
   private handleGetRequest(request: Request): Response {
-    const url = new URL(request.url);
-    const sessionId = request.headers.get('mcp-session-id');
-    const lastEventId = request.headers.get('last-event-id');
+    const url = new URL(request.url)
+    const sessionId = request.headers.get('mcp-session-id')
+    const lastEventId = request.headers.get('last-event-id')
 
     // For now, return basic server capabilities instead of starting an SSE stream
     // Full SSE implementation would require persistent connections which is complex in Workers
@@ -107,7 +108,7 @@ export class CloudflareStreamableHttpTransport {
           'mcp-session-id': sessionId || crypto.randomUUID(),
         },
       }
-    );
+    )
   }
 
   /**
@@ -116,8 +117,8 @@ export class CloudflareStreamableHttpTransport {
    */
   private async handlePostRequest(request: Request): Promise<Response> {
     try {
-      const body = await request.json() as any;
-      const sessionId = request.headers.get('mcp-session-id');
+      const body = await request.json() as any
+      const sessionId = request.headers.get('mcp-session-id')
 
       // Basic JSON-RPC message validation
       if (!body.jsonrpc || body.jsonrpc !== '2.0') {
@@ -132,28 +133,28 @@ export class CloudflareStreamableHttpTransport {
           }),
           {
             status: 400,
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
             },
           }
-        );
+        )
       }
 
       // Route the JSON-RPC message to the MCP server
-      const result = await this.routeJsonRpcMessage(body);
+      const result = await this.routeJsonRpcMessage(body)
 
       return new Response(
         JSON.stringify(result),
         {
           status: 200,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
             'mcp-session-id': sessionId || crypto.randomUUID(),
           },
         }
-      );
+      )
 
     } catch (error) {
       return new Response(
@@ -167,12 +168,12 @@ export class CloudflareStreamableHttpTransport {
         }),
         {
           status: 400,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
           },
         }
-      );
+      )
     }
   }
 
@@ -180,7 +181,7 @@ export class CloudflareStreamableHttpTransport {
    * Route JSON-RPC messages to appropriate MCP server handlers
    */
   private async routeJsonRpcMessage(message: any): Promise<any> {
-    const { method, params, id } = message;
+    const {method, params, id} = message
 
     try {
       switch (method) {
@@ -200,67 +201,67 @@ export class CloudflareStreamableHttpTransport {
                 version: '1.0.0',
               },
             },
-          };
+          }
 
         case 'tools/list':
           // Get tools from the server
-          const tools = await this.getToolsList();
+          const tools = await this.getToolsList()
           return {
             jsonrpc: '2.0',
             id,
             result: {
               tools,
             },
-          };
+          }
 
         case 'resources/list':
           // Get resources from the server
-          const resources = await this.getResourcesList();
+          const resources = await this.getResourcesList()
           return {
             jsonrpc: '2.0',
             id,
             result: {
               resources,
             },
-          };
+          }
 
         case 'prompts/list':
           // Get prompts from the server
-          const prompts = await this.getPromptsList();
+          const prompts = await this.getPromptsList()
           return {
             jsonrpc: '2.0',
             id,
             result: {
               prompts,
             },
-          };
+          }
 
         case 'tools/call':
           // Handle tool calls
-          const toolResult = await this.handleToolCall(params);
+          const toolResult = await this.handleToolCall(params)
           return {
             jsonrpc: '2.0',
             id,
             result: toolResult,
-          };
+          }
 
         case 'resources/read':
           // Handle resource reads
-          const resourceResult = await this.handleResourceRead(params);
+          const resourceResult = await this.handleResourceRead(params)
           return {
             jsonrpc: '2.0',
             id,
             result: resourceResult,
-          };
+          }
 
         case 'prompts/get':
           // Handle prompt gets
-          const promptResult = await this.handlePromptGet(params);
+          const promptResult = await this.handlePromptGet(params)
           return {
             jsonrpc: '2.0',
             id,
             result: promptResult,
-          };
+          }
 
         default:
           return {
@@ -271,7 +272,7 @@ export class CloudflareStreamableHttpTransport {
               message: 'Method not found',
               data: `Unknown method: ${method}`,
             },
-          };
+          }
       }
     } catch (error) {
       return {
@@ -282,7 +283,7 @@ export class CloudflareStreamableHttpTransport {
           message: 'Internal error',
           data: error instanceof Error ? error.message : String(error),
         },
-      };
+      }
     }
   }
 
@@ -299,10 +300,10 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Name or title of the memory' },
-            content: { type: 'string', description: 'Content of the memory' },
-            url: { type: 'string', description: 'Optional URL to fetch content from' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Optional tags' },
+            name: {type: 'string', description: 'Name or title of the memory'},
+            content: {type: 'string', description: 'Content of the memory'},
+            url: {type: 'string', description: 'Optional URL to fetch content from'},
+            tags: {type: 'array', items: {type: 'string'}, description: 'Optional tags'},
           },
           required: ['name', 'content'],
         },
@@ -313,7 +314,7 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            id: { type: 'string', description: 'Memory ID to retrieve' },
+            id: {type: 'string', description: 'Memory ID to retrieve'},
           },
           required: ['id'],
         },
@@ -324,9 +325,9 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            limit: { type: 'number', description: 'Maximum number of memories to return' },
-            offset: { type: 'number', description: 'Number of memories to skip' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
+            limit: {type: 'number', description: 'Maximum number of memories to return'},
+            offset: {type: 'number', description: 'Number of memories to skip'},
+            tags: {type: 'array', items: {type: 'string'}, description: 'Filter by tags'},
           },
         },
       },
@@ -336,7 +337,7 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            id: { type: 'string', description: 'Memory ID to delete' },
+            id: {type: 'string', description: 'Memory ID to delete'},
           },
           required: ['id'],
         },
@@ -347,7 +348,7 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            id: { type: 'string', description: 'Memory ID to update' },
+            id: {type: 'string', description: 'Memory ID to update'},
           },
         },
       },
@@ -357,10 +358,10 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'Search query for content' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Tags to filter by' },
-            limit: { type: 'number', description: 'Maximum number of results to return' },
-            offset: { type: 'number', description: 'Number of results to skip' },
+            query: {type: 'string', description: 'Search query for content'},
+            tags: {type: 'array', items: {type: 'string'}, description: 'Tags to filter by'},
+            limit: {type: 'number', description: 'Maximum number of results to return'},
+            offset: {type: 'number', description: 'Number of results to skip'},
           },
         },
       },
@@ -370,25 +371,25 @@ export class CloudflareStreamableHttpTransport {
         inputSchema: {
           type: 'object',
           properties: {
-            memoryId: { type: 'string', description: 'Memory ID to add tags to' },
-            tags: { type: 'array', items: { type: 'string' }, description: 'Tags to add' },
+            memoryId: {type: 'string', description: 'Memory ID to add tags to'},
+            tags: {type: 'array', items: {type: 'string'}, description: 'Tags to add'},
           },
           required: ['memoryId', 'tags'],
         },
       },
-    ];
+    ]
   }
 
   /**
    * Get resources list from MCP server
    */
   private async getResourcesList(): Promise<any[]> {
-    const { listMemoryResources } = await import('../resources/memory.js');
-    
+    const {listMemoryResources} = await import('../resources/memory.js')
+
     try {
       // Get actual memory resources from the database
-      const memoryResources = await listMemoryResources(this.env);
-      
+      const memoryResources = await listMemoryResources(this.env)
+
       // Start with the special list resource
       const resources = [
         {
@@ -397,14 +398,14 @@ export class CloudflareStreamableHttpTransport {
           description: 'List of all available memories with their metadata',
           mimeType: 'application/json',
         }
-      ];
-      
+      ]
+
       // Add individual memory resources
-      resources.push(...memoryResources);
-      
-      return resources;
+      resources.push(...memoryResources)
+
+      return resources
     } catch (error) {
-      console.error('Error getting resources list:', error);
+      console.error('Error getting resources list:', error)
       // Fallback to basic list if there's an error
       return [
         {
@@ -413,7 +414,7 @@ export class CloudflareStreamableHttpTransport {
           description: 'List of all available memories',
           mimeType: 'application/json',
         },
-      ];
+      ]
     }
   }
 
@@ -421,19 +422,19 @@ export class CloudflareStreamableHttpTransport {
    * Get prompts list from MCP server
    */
   private async getPromptsList(): Promise<any[]> {
-    const { availableWorkflowPrompts } = await import('../prompts/workflows.js');
-    
+    const {availableWorkflowPrompts} = await import('../prompts/workflows.js')
+
     try {
       // Get actual workflow prompts
       return availableWorkflowPrompts.map(prompt => ({
         name: prompt.name,
         description: prompt.description,
         arguments: prompt.arguments || []
-      }));
+      }))
     } catch (error) {
-      console.error('Error getting prompts list:', error);
+      console.error('Error getting prompts list:', error)
       // Fallback to empty list if there's an error
-      return [];
+      return []
     }
   }
 
@@ -442,28 +443,28 @@ export class CloudflareStreamableHttpTransport {
    */
   private async handleToolCall(params: any): Promise<any> {
     // Import handlers dynamically to avoid circular dependencies
-    const { handleAddMemory, handleGetMemory, handleListMemories, handleDeleteMemory, handleUpdateUrlContent } = await import('../tools/memory.js');
-    const { handleFindMemories, handleAddTags } = await import('../tools/search.js');
+    const {handleAddMemory, handleGetMemory, handleListMemories, handleDeleteMemory, handleUpdateUrlContent} = await import('../tools/memory.js')
+    const {handleFindMemories, handleAddTags} = await import('../tools/search.js')
 
-    const { name, arguments: args } = params;
+    const {name, arguments: args} = params
 
     switch (name) {
       case 'add_memory':
-        return await handleAddMemory(this.env, args);
+        return await handleAddMemory(this.env, args)
       case 'get_memory':
-        return await handleGetMemory(this.env, args);
+        return await handleGetMemory(this.env, args)
       case 'list_memories':
-        return await handleListMemories(this.env, args);
+        return await handleListMemories(this.env, args)
       case 'delete_memory':
-        return await handleDeleteMemory(this.env, args);
+        return await handleDeleteMemory(this.env, args)
       case 'update_url_content':
-        return await handleUpdateUrlContent(this.env, args);
+        return await handleUpdateUrlContent(this.env, args)
       case 'find_memories':
-        return await handleFindMemories(this.env, args);
+        return await handleFindMemories(this.env, args)
       case 'add_tags':
-        return await handleAddTags(this.env, args);
+        return await handleAddTags(this.env, args)
       default:
-        throw new Error(`Unknown tool: ${name}`);
+        throw new Error(`Unknown tool: ${name}`)
     }
   }
 
@@ -471,27 +472,27 @@ export class CloudflareStreamableHttpTransport {
    * Handle resource reads
    */
   private async handleResourceRead(params: any): Promise<any> {
-    const { handleMemoryResource, handleMemoryTextResource, listMemoryResources } = await import('../resources/memory.js');
-    const { uri } = params;
+    const {handleMemoryResource, handleMemoryTextResource, listMemoryResources} = await import('../resources/memory.js')
+    const {uri} = params
 
     // Handle special memory://list resource
     if (uri === 'memory://list') {
-      const memories = await listMemoryResources(this.env);
+      const memories = await listMemoryResources(this.env)
       return {
         contents: [{
           uri,
           text: JSON.stringify(memories, null, 2),
           mimeType: 'application/json'
         }]
-      };
+      }
     }
 
     if (uri.startsWith('memory://') && uri.endsWith('/text')) {
-      return await handleMemoryTextResource(this.env, uri);
+      return await handleMemoryTextResource(this.env, uri)
     } else if (uri.startsWith('memory://')) {
-      return await handleMemoryResource(this.env, uri);
+      return await handleMemoryResource(this.env, uri)
     } else {
-      throw new Error(`Unsupported resource URI: ${uri}`);
+      throw new Error(`Unsupported resource URI: ${uri}`)
     }
   }
 
@@ -499,10 +500,10 @@ export class CloudflareStreamableHttpTransport {
    * Handle prompt gets
    */
   private async handlePromptGet(params: any): Promise<any> {
-    const { getWorkflowPrompt } = await import('../prompts/workflows.js');
-    const { name, arguments: args = {} } = params;
+    const {getWorkflowPrompt} = await import('../prompts/workflows.js')
+    const {name, arguments: args = {}} = params
 
-    const promptContent = getWorkflowPrompt(name, args);
+    const promptContent = getWorkflowPrompt(name, args)
     return {
       description: `Generated ${name} workflow prompt`,
       messages: [
@@ -514,15 +515,15 @@ export class CloudflareStreamableHttpTransport {
           },
         },
       ],
-    };
+    }
   }
 
   /**
    * Handle DELETE requests for session termination
    */
   private handleDeleteRequest(request: Request): Response {
-    const sessionId = request.headers.get('mcp-session-id');
-    
+    const sessionId = request.headers.get('mcp-session-id')
+
     return new Response(
       JSON.stringify({
         message: 'Session terminated',
@@ -530,11 +531,11 @@ export class CloudflareStreamableHttpTransport {
       }),
       {
         status: 200,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
       }
-    );
+    )
   }
 }
