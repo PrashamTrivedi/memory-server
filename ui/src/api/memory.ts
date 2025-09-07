@@ -103,10 +103,10 @@ class MemoryApiClient {
       throw new Error(`Failed to search memories: ${response.statusText}`);
     }
     const data: ApiResponse<Memory[]> = await response.json();
-    if (!data.success || !data.data) {
+    if (!data.success) {
       throw new Error(data.error || 'Failed to search memories');
     }
-    return data.data || [];
+    return Array.isArray(data.data) ? data.data : [];
   }
 
   async getMemoryStats(): Promise<MemoryStats> {

@@ -37,7 +37,7 @@ export function MemoryManagement() {
 
   // Determine which memories to show
   const isSearchMode = searchQuery.trim().length > 0;
-  const memories = isSearchMode ? (searchResults || []) : (memoriesData?.memories || []);
+  const memories = isSearchMode ? (searchResults?.data || searchResults || []) : (memoriesData?.memories || []);
   const isLoadingMemories = isSearchMode ? isSearching : isLoading;
 
   const handleSearch = useCallback((query: string) => {
