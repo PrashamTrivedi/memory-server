@@ -1,85 +1,85 @@
-import { useState, useCallback } from 'react';
-import { 
-  useMemories, 
-  useSearchMemories, 
-  useCreateMemory, 
-  useUpdateMemory, 
+import {useState, useCallback} from 'react'
+import {
+  useMemories,
+  useSearchMemories,
+  useCreateMemory,
+  useUpdateMemory,
   useDeleteMemory,
-  useMemoryStats 
-} from '../api/memory';
-import { Memory, CreateMemoryRequest, UpdateMemoryRequest } from '../types/memory';
-import { SearchBar } from '../components/SearchBar';
-import { MemoryList } from '../components/MemoryList';
-import { MemoryForm } from '../components/MemoryForm';
-import { MemoryDetail } from '../components/MemoryDetail';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import './MemoryManagement.css';
+  useMemoryStats
+} from '../api/memory'
+import {Memory, CreateMemoryRequest, UpdateMemoryRequest} from '../types/memory'
+import {SearchBar} from '../components/SearchBar'
+import {MemoryList} from '../components/MemoryList'
+import {MemoryForm} from '../components/MemoryForm'
+import {MemoryDetail} from '../components/MemoryDetail'
+import {LoadingSpinner} from '../components/LoadingSpinner'
+import './MemoryManagement.css'
 
-type ViewMode = 'list' | 'create' | 'edit' | 'detail';
+type ViewMode = 'list' | 'create' | 'edit' | 'detail'
 
 export function MemoryManagement() {
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(0)
 
   // API hooks
-  const { data: memoriesData, isLoading, error } = useMemories(currentPage, 20);
-  const { data: searchResults, isLoading: isSearching } = useSearchMemories({
+  const {data: memoriesData, isLoading, error} = useMemories(currentPage, 20)
+  const {data: searchResults, isLoading: isSearching} = useSearchMemories({
     query: searchQuery,
     limit: 20,
-  });
-  const { data: stats } = useMemoryStats();
-  
-  const createMemoryMutation = useCreateMemory();
-  const updateMemoryMutation = useUpdateMemory();
-  const deleteMemoryMutation = useDeleteMemory();
+  })
+  const {data: stats} = useMemoryStats()
+
+  const createMemoryMutation = useCreateMemory()
+  const updateMemoryMutation = useUpdateMemory()
+  const deleteMemoryMutation = useDeleteMemory()
 
   // Determine which memories to show
-  const isSearchMode = searchQuery.trim().length > 0;
-  const memories = isSearchMode ? (searchResults?.memories || []) : (memoriesData?.memories || []);
-  const isLoadingMemories = isSearchMode ? isSearching : isLoading;
+  const isSearchMode = searchQuery.trim().length > 0
+  const memories = isSearchMode ? (searchResults?.memories || []) : (memoriesData?.memories || [])
+  const isLoadingMemories = isSearchMode ? isSearching : isLoading
 
   const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    setCurrentPage(1);
-  }, []);
+    setSearchQuery(query)
+    setCurrentPage(1)
+  }, [])
 
   const handleCreateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
-    await createMemoryMutation.mutateAsync(data as CreateMemoryRequest);
-    setViewMode('list');
-  };
+    await createMemoryMutation.mutateAsync(data as CreateMemoryRequest)
+    setViewMode('list')
+  }
 
   const handleUpdateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
-    if (!selectedMemory) return;
-    await updateMemoryMutation.mutateAsync({ id: selectedMemory.id, memory: data as UpdateMemoryRequest });
-    setSelectedMemory(null);
-    setViewMode('list');
-  };
+    if (!selectedMemory) return
+    await updateMemoryMutation.mutateAsync({id: selectedMemory.id, memory: data as UpdateMemoryRequest})
+    setSelectedMemory(null)
+    setViewMode('list')
+  }
 
   const handleDeleteMemory = async (memory: Memory) => {
-    await deleteMemoryMutation.mutateAsync(memory.id);
+    await deleteMemoryMutation.mutateAsync(memory.id)
     if (selectedMemory?.id === memory.id) {
-      setSelectedMemory(null);
-      setViewMode('list');
+      setSelectedMemory(null)
+      setViewMode('list')
     }
-  };
+  }
 
   const handleMemoryClick = (memory: Memory) => {
-    setSelectedMemory(memory);
-    setViewMode('detail');
-  };
+    setSelectedMemory(memory)
+    setViewMode('detail')
+  }
 
   const handleMemoryEdit = (memory: Memory) => {
-    setSelectedMemory(memory);
-    setViewMode('edit');
-  };
+    setSelectedMemory(memory)
+    setViewMode('edit')
+  }
 
   const handleLoadMore = () => {
     if (!isSearchMode && memoriesData) {
-      setCurrentPage(prev => prev + 1);
+      setCurrentPage(prev => prev + 1)
     }
-  };
+  }
 
   const renderHeader = () => (
     <div className="memory-management-header">
@@ -90,11 +90,11 @@ export function MemoryManagement() {
           className="create-memory-btn"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path 
-              d="M12 5V19M5 12H19" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
+            <path
+              d="M12 5V19M5 12H19"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
@@ -126,7 +126,7 @@ export function MemoryManagement() {
         />
       </div>
     </div>
-  );
+  )
 
   const renderContent = () => {
     switch (viewMode) {
@@ -137,7 +137,7 @@ export function MemoryManagement() {
             onCancel={() => setViewMode('list')}
             isSubmitting={createMemoryMutation.isPending}
           />
-        );
+        )
 
       case 'edit':
         return selectedMemory ? (
@@ -145,25 +145,25 @@ export function MemoryManagement() {
             memory={selectedMemory}
             onSubmit={handleUpdateMemory}
             onCancel={() => {
-              setSelectedMemory(null);
-              setViewMode('list');
+              setSelectedMemory(null)
+              setViewMode('list')
             }}
             isSubmitting={updateMemoryMutation.isPending}
           />
-        ) : null;
+        ) : null
 
       case 'detail':
         return selectedMemory ? (
           <MemoryDetail
             memory={selectedMemory}
             onClose={() => {
-              setSelectedMemory(null);
-              setViewMode('list');
+              setSelectedMemory(null)
+              setViewMode('list')
             }}
             onEdit={() => setViewMode('edit')}
             onDelete={() => handleDeleteMemory(selectedMemory)}
           />
-        ) : null;
+        ) : null
 
       default:
         return (
@@ -177,7 +177,7 @@ export function MemoryManagement() {
                   </div>
                 ) : (
                   <p>
-                    {memories.length > 0 
+                    {memories.length > 0
                       ? `Found ${memories.length} memories matching "${searchQuery}"`
                       : `No memories found for "${searchQuery}"`
                     }
@@ -197,14 +197,14 @@ export function MemoryManagement() {
               hasMore={!isSearchMode && memoriesData ? memories.length < memoriesData.total : false}
             />
           </div>
-        );
+        )
     }
-  };
+  }
 
   return (
     <div className="memory-management">
       {viewMode === 'list' && renderHeader()}
       {renderContent()}
     </div>
-  );
+  )
 }
