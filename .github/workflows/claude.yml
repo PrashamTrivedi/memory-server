@@ -25,6 +25,16 @@ jobs:
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
+
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'PrashamTrivedi/claudeSettings'
+          path: '~/.claude'
+          fetch-depth: 1
+
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -35,7 +45,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          
+          claude_args: "--max-turns 5 --mcp-config ~/claude/mcp.json"
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
