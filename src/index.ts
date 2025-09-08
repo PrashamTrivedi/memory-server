@@ -27,6 +27,7 @@ app.get('/', (c) => {
 });
 
 // Tag Hierarchy API endpoints
+app.post('/api/tags/create-with-parent', tagHierarchyHandlers.createTagsWithRelationship);
 app.post('/api/tags/:id/parent', tagHierarchyHandlers.addParent);
 app.delete('/api/tags/:id/parent/:parentId', tagHierarchyHandlers.removeParent);
 app.get('/api/tags/:id/ancestors', tagHierarchyHandlers.getAncestors);
