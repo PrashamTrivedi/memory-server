@@ -33,7 +33,7 @@ jobs:
           repository: 'PrashamTrivedi/claudeSettings'
           path: '~/.claude'
           fetch-depth: 1
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.CLAUDE_PROMPTS_PAT }}
 
 
       - name: Checkout repository
