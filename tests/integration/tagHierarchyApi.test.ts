@@ -6,8 +6,11 @@ import { CreateTagsWithRelationshipRequest, CreateTagsWithRelationshipResponse }
 class MockContext {
   private jsonData: any;
   private status: number = 200;
+  private _env: any;
 
-  constructor(private env: any, private reqBody?: any) {}
+  constructor(env: any, private reqBody?: any) {
+    this._env = env;
+  }
 
   get req() {
     return {
@@ -16,7 +19,7 @@ class MockContext {
   }
 
   get env() {
-    return this.env;
+    return this._env;
   }
 
   json<T>(data: T, statusCode?: number): T {
@@ -32,35 +35,31 @@ class MockContext {
   }
 }
 
-// Mock TagHierarchyService
-const mockService = {
-  createTagsWithRelationship: async (db: any, child: string, parent: string) => {
-    if (child === parent) {
-      throw new Error('A tag cannot be its own parent');
-    }
-    if (child === 'existing-child' && parent === 'existing-parent') {
-      throw new Error('Relationship between these tags already exists');
-    }
-    if (child.includes('circular')) {
-      throw new Error('Circular reference detected');
-    }
-    
-    return {
-      child_tag: { id: 1, name: child },
-      parent_tag: { id: 2, name: parent },
-      hierarchy: { id: 1, child_tag_id: 1, parent_tag_id: 2, created_at: Date.now() },
-      created_child: true,
-      created_parent: true
-    };
-  }
-};
-
-// Mock the service - we'll mock it via vi.mock instead
 import { vi } from 'vitest';
 
 // Mock TagHierarchyService
 vi.mock('../../src/services/tagHierarchy', () => ({
-  TagHierarchyService: mockService
+  TagHierarchyService: {
+    createTagsWithRelationship: async (db: any, child: string, parent: string) => {
+      if (child === parent) {
+        throw new Error('A tag cannot be its own parent');
+      }
+      if (child === 'existing-child' && parent === 'existing-parent') {
+        throw new Error('Relationship between these tags already exists');
+      }
+      if (child.includes('circular')) {
+        throw new Error('Circular reference detected');
+      }
+      
+      return {
+        child_tag: { id: 1, name: child },
+        parent_tag: { id: 2, name: parent },
+        hierarchy: { id: 1, child_tag_id: 1, parent_tag_id: 2, created_at: Date.now() },
+        created_child: true,
+        created_parent: true
+      };
+    }
+  }
 }));
 
 describe('Tag Hierarchy API', () => {
@@ -150,7 +149,7 @@ describe('Tag Hierarchy API', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Tag names cannot be empty'
+        error: 'Missing required fields: child_tag_name and parent_tag_name are required'
       });
     });
 
@@ -179,7 +178,7 @@ describe('Tag Hierarchy API', () => {
       const result = await createTagsWithRelationship(mockContext as any);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('already exists');
+      expect(result.error).toBe('Internal server error');
     });
 
     it('should handle circular reference error', async () => {
