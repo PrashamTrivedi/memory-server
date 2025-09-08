@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTagHierarchy } from '../hooks/useTagHierarchy';
 
 interface TagSelectorProps {

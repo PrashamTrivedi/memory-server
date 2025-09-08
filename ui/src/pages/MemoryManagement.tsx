@@ -45,14 +45,14 @@ export function MemoryManagement() {
     setCurrentPage(1);
   }, []);
 
-  const handleCreateMemory = async (data: CreateMemoryRequest) => {
-    await createMemoryMutation.mutateAsync(data);
+  const handleCreateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
+    await createMemoryMutation.mutateAsync(data as CreateMemoryRequest);
     setViewMode('list');
   };
 
-  const handleUpdateMemory = async (data: UpdateMemoryRequest) => {
+  const handleUpdateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
     if (!selectedMemory) return;
-    await updateMemoryMutation.mutateAsync({ id: selectedMemory.id, memory: data });
+    await updateMemoryMutation.mutateAsync({ id: selectedMemory.id, memory: data as UpdateMemoryRequest });
     setSelectedMemory(null);
     setViewMode('list');
   };

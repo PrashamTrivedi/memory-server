@@ -180,7 +180,7 @@ export function TagManagement() {
               <label>Child Tag:</label>
               <SingleTagSelector
                 selectedTag={state.selectedChildId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id }))}
+                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id || null }))}
                 placeholder="Select child tag..."
               />
             </div>
@@ -189,7 +189,7 @@ export function TagManagement() {
               <label>Parent Tag:</label>
               <SingleTagSelector
                 selectedTag={state.selectedParentId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id }))}
+                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
                 placeholder="Select parent tag..."
               />
             </div>
@@ -231,7 +231,7 @@ export function TagManagement() {
             <label>Parent Tag:</label>
             <SingleTagSelector
               selectedTag={state.selectedParentId || undefined}
-              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id }))}
+              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
               placeholder="Select parent tag for bulk assignment..."
             />
           </div>
