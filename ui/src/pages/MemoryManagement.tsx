@@ -42,7 +42,7 @@ export function MemoryManagement() {
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
-    setCurrentPage(1)
+    setCurrentPage(0)
   }, [])
 
   const handleCreateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
