@@ -1,4 +1,4 @@
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {useQuery, useMutation, useQueryClient, useInfiniteQuery} from '@tanstack/react-query'
 import {
   Memory,
   CreateMemoryRequest,
@@ -131,6 +131,17 @@ export function useMemories(page: number = 0, limit: number = 20) {
   return useQuery({
     queryKey: ['memories', page, limit],
     queryFn: () => memoryApi.getMemories(page, limit),
+  })
+}
+
+export function useInfiniteMemories(limit: number = 20) {
+  return useInfiniteQuery({
+    queryKey: ['memories', 'infinite', limit],
+    queryFn: ({ pageParam = 0 }) => memoryApi.getMemories(pageParam, limit),
+    getNextPageParam: (lastPage) => {
+      return lastPage.pagination.has_more ? (lastPage.pagination.offset / limit) + 1 : undefined
+    },
+    initialPageParam: 0,
   })
 }
 

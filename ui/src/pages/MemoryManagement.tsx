@@ -1,6 +1,6 @@
 import {useState, useCallback} from 'react'
 import {
-  useMemories,
+  useInfiniteMemories,
   useSearchMemories,
   useCreateMemory,
   useUpdateMemory,
@@ -21,10 +21,8 @@ export function MemoryManagement() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentPage, setCurrentPage] = useState(0)
-
-  // API hooks
-  const {data: memoriesData, isLoading, error} = useMemories(currentPage, 3)
+  // API hooks  
+  const {data: memoriesData, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage} = useInfiniteMemories(3)
   const {data: searchResults, isLoading: isSearching} = useSearchMemories({
     query: searchQuery,
     limit: 20,
@@ -37,12 +35,13 @@ export function MemoryManagement() {
 
   // Determine which memories to show
   const isSearchMode = searchQuery.trim().length > 0
-  const memories = isSearchMode ? (searchResults?.memories || []) : (memoriesData?.memories || [])
+  const memories = isSearchMode 
+    ? (searchResults?.memories || []) 
+    : (memoriesData?.pages?.flatMap(page => page.memories) || [])
   const isLoadingMemories = isSearchMode ? isSearching : isLoading
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
-    setCurrentPage(0)
   }, [])
 
   const handleCreateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
@@ -76,8 +75,8 @@ export function MemoryManagement() {
   }
 
   const handleLoadMore = () => {
-    if (!isSearchMode && memoriesData) {
-      setCurrentPage(prev => prev + 1)
+    if (!isSearchMode && hasNextPage) {
+      fetchNextPage()
     }
   }
 
@@ -188,13 +187,13 @@ export function MemoryManagement() {
 
             <MemoryList
               memories={memories}
-              loading={isLoadingMemories}
+              loading={isLoadingMemories || isFetchingNextPage}
               error={error?.message || null}
               onMemoryClick={handleMemoryClick}
               onMemoryEdit={handleMemoryEdit}
               onMemoryDelete={handleDeleteMemory}
               onLoadMore={!isSearchMode ? handleLoadMore : undefined}
-              hasMore={!isSearchMode && memoriesData ? memoriesData.pagination.has_more : false}
+              hasMore={!isSearchMode && hasNextPage}
             />
           </div>
         )
