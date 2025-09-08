@@ -41,17 +41,14 @@ export function createMCPMemoryServer(env: Env): McpServer {
   })
 
   // Register memory management tools
-  server.registerTool(
+  server.tool(
     'add_memory',
+    'Add a new memory to the server with optional URL content fetching',
     {
-      title: 'Add Memory',
-      description: 'Add a new memory to the server with optional URL content fetching',
-      inputSchema: {
-        name: z.string().describe('Name or title of the memory'),
-        content: z.string().describe('Content of the memory'),
-        url: z.string().optional().describe('Optional URL to fetch content from'),
-        tags: z.array(z.string()).optional().describe('Optional tags to associate with the memory'),
-      },
+      name: z.string().describe('Name or title of the memory'),
+      content: z.string().describe('Content of the memory'),
+      url: z.string().optional().describe('Optional URL to fetch content from'),
+      tags: z.array(z.string()).optional().describe('Optional tags to associate with the memory'),
     },
     async (args) => {
       const result = await handleAddMemory(env, args)
@@ -64,14 +61,11 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'get_memory',
+    'Retrieve a specific memory by ID',
     {
-      title: 'Get Memory',
-      description: 'Retrieve a specific memory by ID',
-      inputSchema: {
-        id: z.string().describe('Memory ID to retrieve'),
-      },
+      id: z.string().describe('Memory ID to retrieve'),
     },
     async (args) => {
       const result = await handleGetMemory(env, args)
@@ -84,16 +78,13 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'list_memories',
+    'List all memories with optional filtering and pagination',
     {
-      title: 'List Memories',
-      description: 'List all memories with optional filtering and pagination',
-      inputSchema: {
-        limit: z.number().optional().describe('Maximum number of memories to return'),
-        offset: z.number().optional().describe('Number of memories to skip'),
-        tags: z.array(z.string()).optional().describe('Filter by tags'),
-      },
+      limit: z.number().optional().describe('Maximum number of memories to return'),
+      offset: z.number().optional().describe('Number of memories to skip'),
+      tags: z.array(z.string()).optional().describe('Filter by tags'),
     },
     async (args) => {
       const result = await handleListMemories(env, args)
@@ -106,14 +97,11 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'delete_memory',
+    'Delete a specific memory by ID',
     {
-      title: 'Delete Memory',
-      description: 'Delete a specific memory by ID',
-      inputSchema: {
-        id: z.string().describe('Memory ID to delete'),
-      },
+      id: z.string().describe('Memory ID to delete'),
     },
     async (args) => {
       const result = await handleDeleteMemory(env, args)
@@ -126,14 +114,11 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'update_url_content',
+    'Update content of memories by fetching from their URLs',
     {
-      title: 'Update URL Content',
-      description: 'Update content of memories by fetching from their URLs',
-      inputSchema: {
-        id: z.string().optional().describe('Memory ID to update (optional, updates all if not provided)'),
-      },
+      id: z.string().optional().describe('Memory ID to update (optional, updates all if not provided)'),
     },
     async (args) => {
       const result = await handleUpdateUrlContent(env, args)
@@ -146,17 +131,14 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'find_memories',
+    'Search memories by content or tags with advanced filtering',
     {
-      title: 'Find Memories',
-      description: 'Search memories by content or tags with advanced filtering',
-      inputSchema: {
-        query: z.string().optional().describe('Search query for content'),
-        tags: z.array(z.string()).optional().describe('Tags to filter by'),
-        limit: z.number().optional().describe('Maximum number of results to return'),
-        offset: z.number().optional().describe('Number of results to skip'),
-      },
+      query: z.string().optional().describe('Search query for content'),
+      tags: z.array(z.string()).optional().describe('Tags to filter by'),
+      limit: z.number().optional().describe('Maximum number of results to return'),
+      offset: z.number().optional().describe('Number of results to skip'),
     },
     async (args) => {
       const result = await handleFindMemories(env, args)
@@ -169,15 +151,12 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.registerTool(
+  server.tool(
     'add_tags',
+    'Add tags to existing memories',
     {
-      title: 'Add Tags',
-      description: 'Add tags to existing memories',
-      inputSchema: {
-        memoryId: z.string().describe('Memory ID to add tags to'),
-        tags: z.array(z.string()).describe('Tags to add'),
-      },
+      memoryId: z.string().describe('Memory ID to add tags to'),
+      tags: z.array(z.string()).describe('Tags to add'),
     },
     async (args) => {
       const result = await handleAddTags(env, args)
@@ -265,14 +244,11 @@ export function createMCPMemoryServer(env: Env): McpServer {
       }
     }
 
-    server.registerPrompt(
+    server.prompt(
       prompt.name,
-      {
-        title: prompt.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        description: prompt.description,
-        argsSchema: argsSchema,
-      },
-      (args: any) => {
+      prompt.description,
+      argsSchema,
+      async (args: any) => {
         const promptContent = getWorkflowPrompt(prompt.name, args)
         return {
           messages: [{
