@@ -24,7 +24,7 @@ export function MemoryManagement() {
   const [currentPage, setCurrentPage] = useState(0)
 
   // API hooks
-  const {data: memoriesData, isLoading, error} = useMemories(currentPage, 20)
+  const {data: memoriesData, isLoading, error} = useMemories(currentPage, 3)
   const {data: searchResults, isLoading: isSearching} = useSearchMemories({
     query: searchQuery,
     limit: 20,
@@ -194,7 +194,7 @@ export function MemoryManagement() {
               onMemoryEdit={handleMemoryEdit}
               onMemoryDelete={handleDeleteMemory}
               onLoadMore={!isSearchMode ? handleLoadMore : undefined}
-              hasMore={!isSearchMode && memoriesData ? memories.length < memoriesData.total : false}
+              hasMore={!isSearchMode && memoriesData ? memoriesData.pagination.has_more : false}
             />
           </div>
         )

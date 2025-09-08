@@ -24,9 +24,12 @@ export interface UpdateMemoryRequest {
 
 export interface MemoryListResponse {
   memories: Memory[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
 }
 
 export interface SearchMemoryRequest {
