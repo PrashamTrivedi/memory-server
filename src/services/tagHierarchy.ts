@@ -281,4 +281,106 @@ export class TagHierarchyService {
     
     return !!result;
   }
+
+  /**
+   * Get tag by name
+   */
+  static async getTagByName(db: D1Database, tagName: string): Promise<Tag | null> {
+    const result = await db.prepare('SELECT id, name FROM tags WHERE name = ?')
+      .bind(tagName)
+      .first<TagRow>();
+    
+    return result || null;
+  }
+
+  /**
+   * Create tag
+   */
+  static async createTag(db: D1Database, tagName: string): Promise<Tag> {
+    const result = await db.prepare('INSERT INTO tags (name) VALUES (?) RETURNING id, name')
+      .bind(tagName)
+      .first<TagRow>();
+    
+    if (!result) {
+      throw new Error('Failed to create tag');
+    }
+
+    return result;
+  }
+
+  /**
+   * Create tags with parent-child relationship
+   * Validates that if both tags exist, they don't already have this relationship
+   * Creates missing tags and establishes hierarchy
+   */
+  static async createTagsWithRelationship(
+    db: D1Database, 
+    childTagName: string, 
+    parentTagName: string
+  ): Promise<{
+    child_tag: Tag;
+    parent_tag: Tag;
+    hierarchy: TagHierarchy;
+    created_child: boolean;
+    created_parent: boolean;
+  }> {
+    // Validate input
+    if (!childTagName.trim() || !parentTagName.trim()) {
+      throw new Error('Tag names cannot be empty');
+    }
+
+    // Prevent self-reference
+    if (childTagName.trim() === parentTagName.trim()) {
+      throw new Error('A tag cannot be its own parent');
+    }
+
+    // Check if tags exist
+    const existingChildTag = await this.getTagByName(db, childTagName.trim());
+    const existingParentTag = await this.getTagByName(db, parentTagName.trim());
+
+    // If both tags exist, check if relationship already exists
+    if (existingChildTag && existingParentTag) {
+      const existingRelation = await db.prepare(
+        'SELECT id FROM tag_hierarchy WHERE child_tag_id = ? AND parent_tag_id = ?'
+      ).bind(existingChildTag.id, existingParentTag.id).first();
+
+      if (existingRelation) {
+        throw new Error('Relationship between these tags already exists');
+      }
+    }
+
+    // Create missing tags
+    let childTag: Tag;
+    let parentTag: Tag;
+    let createdChild = false;
+    let createdParent = false;
+
+    if (existingChildTag) {
+      childTag = existingChildTag;
+    } else {
+      childTag = await this.createTag(db, childTagName.trim());
+      createdChild = true;
+    }
+
+    if (existingParentTag) {
+      parentTag = existingParentTag;
+    } else {
+      parentTag = await this.createTag(db, parentTagName.trim());
+      createdParent = true;
+    }
+
+    // Validate hierarchy to prevent circular references
+    await this.validateHierarchy(db, childTag.id, parentTag.id);
+
+    // Create hierarchy relationship
+    const hierarchy = await this.addParent(db, childTag.id, parentTag.id);
+
+    return {
+      child_tag: childTag,
+      parent_tag: parentTag,
+      hierarchy,
+      created_child: createdChild,
+      created_parent: createdParent
+    };
+  }
 }
