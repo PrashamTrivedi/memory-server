@@ -14,7 +14,7 @@ const API_BASE = '/api'
 
 class MemoryApiClient {
   async getMemories(page: number =0 , limit: number = 20): Promise<MemoryListResponse> {
-    const response = await fetch(`${API_BASE}/memories?offset=${page}&limit=${limit}`)
+    const response = await fetch(`${API_BASE}/memories?offset=${page * limit}&limit=${limit}`)
     if (!response.ok) {
       throw new Error(`Failed to fetch memories: ${response.statusText}`)
     }
