@@ -8,7 +8,7 @@ code snippets with intelligent tagging and retrieval.
 
 - 🧠 **Intelligent Memory Management** - Store and retrieve development
   knowledge
-- 🏷️ **Smart Tagging** - Hierarchical tagging system with auto-suggestions
+- 🏷️ **Smart Hierarchical Tagging** - Parent-child tag relationships with auto-creation
 - 🔍 **Advanced Search** - Full-text search across memories and tags
 - 🌐 **URL Content Fetching** - Automatically fetch and store web content
 - 🤖 **MCP Integration** - Full Model Context Protocol support for AI tools
@@ -16,6 +16,55 @@ code snippets with intelligent tagging and retrieval.
 - 🗄️ **D1 Database** - Serverless SQL storage
 - 🔄 **Real-time Sync** - KV cache for performance
 - 🎯 **Workflow Prompts** - Pre-built AI workflows for memory management
+
+## Hierarchical Tagging System
+
+Create and manage parent-child tag relationships for better organization:
+
+### Hierarchical Tag Format
+
+Use the `parent>child` format when adding tags to memories:
+
+```bash
+# Examples of hierarchical tags
+"programming>javascript"     # javascript is a child of programming
+"frontend>react"            # react is a child of frontend  
+"database>postgresql"       # postgresql is a child of database
+```
+
+### Creating Tag Hierarchies
+
+**Via Memory Creation:**
+```json
+{
+  "name": "React Hooks Guide",
+  "content": "Comprehensive guide to React hooks",
+  "tags": ["programming>javascript", "frontend>react", "tutorial"]
+}
+```
+
+**Via Direct API:**
+```bash
+POST /api/tags/create-with-parent
+{
+  "child_tag_name": "javascript", 
+  "parent_tag_name": "programming"
+}
+```
+
+### Smart Tag Creation Rules
+
+- **Both tags exist**: Returns error to prevent disrupting existing relationships
+- **One tag exists**: Creates the missing tag and establishes relationship
+- **Neither tag exists**: Creates both tags and establishes relationship
+- **Automatic validation**: Prevents circular references and self-references
+
+### Benefits
+
+- **Automatic Organization**: Tags are automatically organized in a hierarchy
+- **Better Discovery**: Find related memories through parent-child relationships  
+- **Flexible Structure**: Mix hierarchical and simple tags as needed
+- **Visual Tree View**: See your entire tag structure in the UI
 
 ## Quick Start
 
@@ -97,16 +146,18 @@ The server exposes 7 memory management tools via MCP:
 
 #### Core Memory Tools
 
-**`add_memory`** - Create new memories
+**`add_memory`** - Create new memories with hierarchical tag support
 
 ```json
 {
-  "name": "My Development Note",
+  "name": "My Development Note", 
   "content": "Important information about React hooks",
   "url": "https://react.dev/hooks",
-  "tags": ["react", "hooks", "frontend"]
+  "tags": ["programming>javascript", "frontend>react", "tutorial"]
 }
 ```
+
+*Supports hierarchical tags using "parent>child" format alongside simple tags*
 
 **`get_memory`** - Retrieve specific memory
 
@@ -260,11 +311,22 @@ Add to your Claude Desktop configuration:
 
 ### REST API
 
+#### Memory Management
 - `GET /api/memories` - List memories
-- `POST /api/memories` - Create memory
+- `POST /api/memories` - Create memory (supports hierarchical tags)
 - `GET /api/memories/{id}` - Get memory
-- `PUT /api/memories/{id}` - Update memory
+- `PUT /api/memories/{id}` - Update memory (supports hierarchical tags)
 - `DELETE /api/memories/{id}` - Delete memory
+
+#### Tag Hierarchy Management
+- `POST /api/tags/create-with-parent` - Create parent-child tag relationship
+- `GET /api/tags/tree` - Get complete tag hierarchy tree
+- `GET /api/tags/{id}/ancestors` - Get all ancestor tags
+- `GET /api/tags/{id}/descendants` - Get all descendant tags
+- `GET /api/tags/{id}/parents` - Get immediate parent tags
+- `GET /api/tags/{id}/children` - Get immediate child tags
+- `POST /api/tags/{id}/parent` - Add parent relationship
+- `DELETE /api/tags/{id}/parent/{parentId}` - Remove parent relationship
 
 ### MCP Endpoint
 
