@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Memory, CreateMemoryRequest, UpdateMemoryRequest } from '../types/memory';
 import { TagSelector } from './TagSelector';
+import { HierarchicalTagInput } from './HierarchicalTagInput';
 import { LoadingSpinner } from './LoadingSpinner';
 import './MemoryForm.css';
 
@@ -20,6 +21,7 @@ export function MemoryForm({ memory, onSubmit, onCancel, isSubmitting = false }:
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [tagInputMode, setTagInputMode] = useState<'simple' | 'hierarchical'>('simple');
 
   useEffect(() => {
     if (memory) {
@@ -31,6 +33,25 @@ export function MemoryForm({ memory, onSubmit, onCancel, isSubmitting = false }:
       });
     }
   }, [memory]);
+
+  const validateHierarchicalTags = (tags: string[]): string[] => {
+    const tagErrors: string[] = [];
+    
+    for (const tag of tags) {
+      if (tag.includes('>')) {
+        const parts = tag.split('>');
+        if (parts.length !== 2) {
+          tagErrors.push(`Invalid hierarchical tag format: "${tag}". Use "parent>child" format.`);
+        } else if (parts.some(part => !part.trim())) {
+          tagErrors.push(`Empty parent or child in: "${tag}". Both parent and child names are required.`);
+        } else if (parts[0].trim() === parts[1].trim()) {
+          tagErrors.push(`A tag cannot be its own parent: "${tag}"`);
+        }
+      }
+    }
+    
+    return tagErrors;
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -48,6 +69,14 @@ export function MemoryForm({ memory, onSubmit, onCancel, isSubmitting = false }:
         new URL(formData.url);
       } catch {
         newErrors.url = 'Please enter a valid URL';
+      }
+    }
+
+    // Validate hierarchical tags
+    if (formData.tags.length > 0) {
+      const tagValidationErrors = validateHierarchicalTags(formData.tags);
+      if (tagValidationErrors.length > 0) {
+        newErrors.tags = tagValidationErrors.join(' ');
       }
     }
 
@@ -153,14 +182,47 @@ export function MemoryForm({ memory, onSubmit, onCancel, isSubmitting = false }:
         </div>
 
         <div className="form-group">
-          <label className="form-label">
-            Tags
-          </label>
-          <TagSelector
-            selectedTags={formData.tags}
-            onTagsChange={(tags) => handleInputChange('tags', tags)}
-            disabled={isSubmitting}
-          />
+          <div className="tags-header">
+            <label className="form-label">
+              Tags
+            </label>
+            <div className="tag-mode-toggle">
+              <button
+                type="button"
+                className={`toggle-btn ${tagInputMode === 'simple' ? 'active' : ''}`}
+                onClick={() => setTagInputMode('simple')}
+                disabled={isSubmitting}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${tagInputMode === 'hierarchical' ? 'active' : ''}`}
+                onClick={() => setTagInputMode('hierarchical')}
+                disabled={isSubmitting}
+              >
+                Hierarchical
+              </button>
+            </div>
+          </div>
+          
+          {tagInputMode === 'simple' ? (
+            <TagSelector
+              selectedTags={formData.tags}
+              onTagsChange={(tags) => handleInputChange('tags', tags)}
+              disabled={isSubmitting}
+            />
+          ) : (
+            <HierarchicalTagInput
+              selectedTags={formData.tags}
+              onTagsChange={(tags) => handleInputChange('tags', tags)}
+              disabled={isSubmitting}
+            />
+          )}
+          
+          {errors.tags && (
+            <div className="field-error">{errors.tags}</div>
+          )}
         </div>
 
         <div className="form-actions">

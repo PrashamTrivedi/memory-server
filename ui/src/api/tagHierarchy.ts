@@ -7,7 +7,9 @@ import {
   DescendantsResponse,
   TagTreeResponse,
   ParentsResponse,
-  ChildrenResponse
+  ChildrenResponse,
+  CreateTagsWithParentRequest,
+  CreateTagsWithParentResponse
 } from '../types/tags';
 
 const API_BASE = '/api/tags';
@@ -228,6 +230,49 @@ export class TagHierarchyApi {
 
       const data: TagTreeResponse = await response.json();
       return data.tree || [];
+    } catch (error) {
+      if (error instanceof TagHierarchyApiError) {
+        throw error;
+      }
+      throw new TagHierarchyApiError(
+        error instanceof Error ? error.message : 'Network error occurred'
+      );
+    }
+  }
+
+  /**
+   * Create tags with parent-child relationship
+   */
+  static async createTagsWithParent(
+    childName: string, 
+    parentName: string
+  ): Promise<CreateTagsWithParentResponse> {
+    try {
+      const response = await fetch(`${API_BASE}/create-with-parent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          child_tag_name: childName,
+          parent_tag_name: parentName,
+        } as CreateTagsWithParentRequest),
+      });
+
+      const data: CreateTagsWithParentResponse = await response.json();
+
+      if (!response.ok) {
+        throw new TagHierarchyApiError(
+          data.error || `Failed to create tags with parent: ${response.statusText}`,
+          response.status
+        );
+      }
+
+      if (!data.success) {
+        throw new TagHierarchyApiError(data.error || 'Unknown error occurred');
+      }
+
+      return data;
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;

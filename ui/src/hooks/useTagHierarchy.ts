@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { TagHierarchyApi, TagHierarchyApiError } from '../api/tagHierarchy';
-import { Tag, TagTreeNode, FlatTag, TagPath } from '../types/tags';
+import { Tag, TagTreeNode, FlatTag, TagPath, CreateTagsWithParentResponse } from '../types/tags';
 
 export interface UseTagHierarchyState {
   tree: TagTreeNode[];
@@ -18,6 +18,7 @@ export interface UseTagHierarchyActions {
   selectNode: (nodeId: number) => void;
   addParent: (childId: number, parentId: number) => Promise<void>;
   removeParent: (childId: number, parentId: number) => Promise<void>;
+  createTagsWithParent: (childName: string, parentName: string) => Promise<CreateTagsWithParentResponse>;
   getAncestors: (tagId: number) => Promise<Tag[]>;
   getDescendants: (tagId: number) => Promise<Tag[]>;
   clearError: () => void;
@@ -135,6 +136,24 @@ export function useTagHierarchy(): UseTagHierarchyReturn {
       const errorMessage = err instanceof TagHierarchyApiError 
         ? err.message 
         : 'Failed to remove parent relationship';
+      setError(errorMessage);
+      throw err;
+    }
+  }, [refreshTree]);
+
+  /**
+   * Create tags with parent-child relationship
+   */
+  const createTagsWithParent = useCallback(async (childName: string, parentName: string): Promise<CreateTagsWithParentResponse> => {
+    try {
+      setError(null);
+      const result = await TagHierarchyApi.createTagsWithParent(childName, parentName);
+      await refreshTree(); // Refresh to show new tags
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof TagHierarchyApiError 
+        ? err.message 
+        : 'Failed to create tags with parent relationship';
       setError(errorMessage);
       throw err;
     }
@@ -274,6 +293,7 @@ export function useTagHierarchy(): UseTagHierarchyReturn {
     selectNode,
     addParent,
     removeParent,
+    createTagsWithParent,
     getAncestors,
     getDescendants,
     clearError,

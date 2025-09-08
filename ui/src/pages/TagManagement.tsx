@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { TagTree } from '../components/TagTree';
 import { TagSelector, SingleTagSelector } from '../components/TagSelector';
+import { CreateTagForm } from '../components/CreateTagForm';
 import { useTagHierarchy } from '../hooks/useTagHierarchy';
 
 interface TagManagementState {
-  activeTab: 'tree' | 'relationships' | 'bulk';
+  activeTab: 'tree' | 'relationships' | 'bulk' | 'create';
   selectedParentId: number | null;
   selectedChildId: number | null;
   bulkChildIds: number[];
@@ -34,7 +35,7 @@ export function TagManagement() {
     clearError
   } = useTagHierarchy();
 
-  const handleTabChange = (tab: 'tree' | 'relationships' | 'bulk') => {
+  const handleTabChange = (tab: 'tree' | 'relationships' | 'bulk' | 'create') => {
     setState(prev => ({ ...prev, activeTab: tab }));
     clearOperationMessages();
   };
@@ -271,6 +272,17 @@ export function TagManagement() {
     </div>
   );
 
+  const renderCreateTab = () => (
+    <div className="tab-content">
+      <div className="create-section">
+        <CreateTagForm
+          onSuccess={showOperationResult}
+          onError={showOperationError}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="tag-management-page">
       <div className="page-header">
@@ -284,6 +296,12 @@ export function TagManagement() {
           onClick={() => handleTabChange('tree')}
         >
           Tree View
+        </button>
+        <button
+          className={`tab ${state.activeTab === 'create' ? 'active' : ''}`}
+          onClick={() => handleTabChange('create')}
+        >
+          Create Tags
         </button>
         <button
           className={`tab ${state.activeTab === 'relationships' ? 'active' : ''}`}
@@ -322,6 +340,7 @@ export function TagManagement() {
 
       <div className="tab-container">
         {state.activeTab === 'tree' && renderTreeTab()}
+        {state.activeTab === 'create' && renderCreateTab()}
         {state.activeTab === 'relationships' && renderRelationshipsTab()}
         {state.activeTab === 'bulk' && renderBulkTab()}
       </div>
