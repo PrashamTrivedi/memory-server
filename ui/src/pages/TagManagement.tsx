@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { TagTree } from '../components/TagTree';
 import { TagSelector, SingleTagSelector } from '../components/TagSelector';
+import { CreateTagForm } from '../components/CreateTagForm';
 import { useTagHierarchy } from '../hooks/useTagHierarchy';
 
 interface TagManagementState {
-  activeTab: 'tree' | 'relationships' | 'bulk';
+  activeTab: 'tree' | 'relationships' | 'bulk' | 'create';
   selectedParentId: number | null;
   selectedChildId: number | null;
   bulkChildIds: number[];
@@ -34,7 +35,7 @@ export function TagManagement() {
     clearError
   } = useTagHierarchy();
 
-  const handleTabChange = (tab: 'tree' | 'relationships' | 'bulk') => {
+  const handleTabChange = (tab: 'tree' | 'relationships' | 'bulk' | 'create') => {
     setState(prev => ({ ...prev, activeTab: tab }));
     clearOperationMessages();
   };
@@ -179,7 +180,7 @@ export function TagManagement() {
               <label>Child Tag:</label>
               <SingleTagSelector
                 selectedTag={state.selectedChildId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id }))}
+                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id || null }))}
                 placeholder="Select child tag..."
               />
             </div>
@@ -188,7 +189,7 @@ export function TagManagement() {
               <label>Parent Tag:</label>
               <SingleTagSelector
                 selectedTag={state.selectedParentId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id }))}
+                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
                 placeholder="Select parent tag..."
               />
             </div>
@@ -230,7 +231,7 @@ export function TagManagement() {
             <label>Parent Tag:</label>
             <SingleTagSelector
               selectedTag={state.selectedParentId || undefined}
-              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id }))}
+              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
               placeholder="Select parent tag for bulk assignment..."
             />
           </div>
@@ -271,6 +272,17 @@ export function TagManagement() {
     </div>
   );
 
+  const renderCreateTab = () => (
+    <div className="tab-content">
+      <div className="create-section">
+        <CreateTagForm
+          onSuccess={showOperationResult}
+          onError={showOperationError}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="tag-management-page">
       <div className="page-header">
@@ -284,6 +296,12 @@ export function TagManagement() {
           onClick={() => handleTabChange('tree')}
         >
           Tree View
+        </button>
+        <button
+          className={`tab ${state.activeTab === 'create' ? 'active' : ''}`}
+          onClick={() => handleTabChange('create')}
+        >
+          Create Tags
         </button>
         <button
           className={`tab ${state.activeTab === 'relationships' ? 'active' : ''}`}
@@ -322,6 +340,7 @@ export function TagManagement() {
 
       <div className="tab-container">
         {state.activeTab === 'tree' && renderTreeTab()}
+        {state.activeTab === 'create' && renderCreateTab()}
         {state.activeTab === 'relationships' && renderRelationshipsTab()}
         {state.activeTab === 'bulk' && renderBulkTab()}
       </div>

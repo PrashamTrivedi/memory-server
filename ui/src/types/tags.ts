@@ -61,6 +61,23 @@ export interface ChildrenResponse {
   error?: string;
 }
 
+// New API request/response types for creating tags with parent relationships
+export interface CreateTagsWithParentRequest {
+  child_tag_name: string;
+  parent_tag_name: string;
+}
+
+export interface CreateTagsWithParentResponse {
+  success: boolean;
+  data?: {
+    child_tag: Tag;
+    parent_tag: Tag;
+    relationship_created: boolean;
+  };
+  error?: string;
+  message?: string;
+}
+
 // UI-specific types
 export interface TreeNodeProps {
   node: TagTreeNode;

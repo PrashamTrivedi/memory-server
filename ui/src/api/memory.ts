@@ -1,4 +1,4 @@
-import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query'
+import {useQuery, useMutation, useQueryClient, useInfiniteQuery} from '@tanstack/react-query'
 import {
   Memory,
   CreateMemoryRequest,
@@ -13,8 +13,8 @@ import {
 const API_BASE = '/api'
 
 class MemoryApiClient {
-  async getMemories(page: number = 1, limit: number = 20): Promise<MemoryListResponse> {
-    const response = await fetch(`${API_BASE}/memories?offset=${page}&limit=${limit}`)
+  async getMemories(page: number =0 , limit: number = 20): Promise<MemoryListResponse> {
+    const response = await fetch(`${API_BASE}/memories?offset=${page * limit}&limit=${limit}`)
     if (!response.ok) {
       throw new Error(`Failed to fetch memories: ${response.statusText}`)
     }
@@ -127,10 +127,21 @@ class MemoryApiClient {
 export const memoryApi = new MemoryApiClient()
 
 // React Query Hooks
-export function useMemories(page: number = 1, limit: number = 20) {
+export function useMemories(page: number = 0, limit: number = 20) {
   return useQuery({
     queryKey: ['memories', page, limit],
     queryFn: () => memoryApi.getMemories(page, limit),
+  })
+}
+
+export function useInfiniteMemories(limit: number = 20) {
+  return useInfiniteQuery({
+    queryKey: ['memories', 'infinite', limit],
+    queryFn: ({ pageParam = 0 }) => memoryApi.getMemories(pageParam, limit),
+    getNextPageParam: (lastPage) => {
+      return lastPage.pagination.has_more ? (lastPage.pagination.offset / limit) + 1 : undefined
+    },
+    initialPageParam: 0,
   })
 }
 

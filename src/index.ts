@@ -4,6 +4,13 @@ import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
 import { handleMCPHttpRequest } from './mcp/server';
 
+export interface Env {
+  DB: D1Database;
+  CACHE_KV: KVNamespace;
+  BROWSER: Fetcher;
+  ENVIRONMENT: string;
+}
+
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -20,6 +27,7 @@ app.get('/', (c) => {
 });
 
 // Tag Hierarchy API endpoints
+app.post('/api/tags/create-with-parent', tagHierarchyHandlers.createTagsWithRelationship);
 app.post('/api/tags/:id/parent', tagHierarchyHandlers.addParent);
 app.delete('/api/tags/:id/parent/:parentId', tagHierarchyHandlers.removeParent);
 app.get('/api/tags/:id/ancestors', tagHierarchyHandlers.getAncestors);

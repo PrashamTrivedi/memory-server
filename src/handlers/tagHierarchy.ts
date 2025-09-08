@@ -10,8 +10,58 @@ import {
   TagHierarchyResponse,
   AncestorsResponse,
   DescendantsResponse,
-  TagTreeResponse
+  TagTreeResponse,
+  CreateTagsWithRelationshipRequest,
+  CreateTagsWithRelationshipResponse
 } from '../../types/index';
+
+/**
+ * Create tags with parent-child relationship
+ * POST /api/tags/create-with-parent
+ */
+export async function createTagsWithRelationship(c: Context<{ Bindings: Env }>) {
+  try {
+    const body = await c.req.json<CreateTagsWithRelationshipRequest>();
+    
+    // Validate required fields
+    if (!body.child_tag_name || !body.parent_tag_name) {
+      return c.json<CreateTagsWithRelationshipResponse>({
+        success: false,
+        error: 'Missing required fields: child_tag_name and parent_tag_name are required'
+      }, 400);
+    }
+
+    // Validate tag names are not empty strings
+    if (!body.child_tag_name.trim() || !body.parent_tag_name.trim()) {
+      return c.json<CreateTagsWithRelationshipResponse>({
+        success: false,
+        error: 'Tag names cannot be empty'
+      }, 400);
+    }
+
+    // Prevent self-reference
+    if (body.child_tag_name.trim() === body.parent_tag_name.trim()) {
+      return c.json<CreateTagsWithRelationshipResponse>({
+        success: false,
+        error: 'A tag cannot be its own parent'
+      }, 400);
+    }
+
+    const result = await TagHierarchyService.createTagsWithRelationship(
+      c.env.DB,
+      body.child_tag_name,
+      body.parent_tag_name
+    );
+
+    return c.json<CreateTagsWithRelationshipResponse>({
+      success: true,
+      data: result
+    }, 201);
+
+  } catch (error) {
+    return handleTagHierarchyError(error, c);
+  }
+}
 
 /**
  * Add a parent relationship to a tag

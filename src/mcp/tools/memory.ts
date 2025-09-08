@@ -5,6 +5,7 @@ import {
   CreateMemoryRequest, 
   UpdateMemoryRequest 
 } from '../../../types/index';
+import { TagHierarchyService } from '../../services/tagHierarchy';
 
 // Tool type definition
 interface Tool {
@@ -39,7 +40,7 @@ export const addMemoryTool: Tool = {
       tags: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Optional tags to associate with the memory',
+        description: 'Optional tags to associate with the memory. Supports hierarchical format like "parent>child"',
       },
     },
     required: ['name', 'content'],
@@ -445,24 +446,77 @@ async function getMemoryTags(db: D1Database, memoryId: string): Promise<string[]
   return result.results?.map(r => r.name) || [];
 }
 
+/**
+ * Assign tags to memory with hierarchical tag support
+ * Supports both simple tags and hierarchical format like "parent>child"
+ */
 async function assignTagsToMemory(db: D1Database, memoryId: string, tagNames: string[]): Promise<void> {
   for (const tagName of tagNames) {
     if (!tagName.trim()) continue;
     
-    // Get or create tag
-    let tagId = await getOrCreateTag(db, tagName.trim());
-    
-    // Link memory to tag
-    try {
-      await db.prepare(`
-        INSERT INTO memory_tags (memory_id, tag_id)
-        VALUES (?, ?)
-      `).bind(memoryId, tagId).run();
-    } catch (error) {
-      // Ignore duplicate key errors
-      if (error instanceof Error && !error.message.includes('UNIQUE constraint failed')) {
-        throw error;
-      }
+    // Check if tag has hierarchical format (parent>child)
+    if (tagName.includes('>')) {
+      await processHierarchicalTag(db, memoryId, tagName.trim());
+    } else {
+      // Process simple tag
+      const tagId = await getOrCreateTag(db, tagName.trim());
+      await linkTagToMemory(db, memoryId, tagId);
+    }
+  }
+}
+
+/**
+ * Process hierarchical tag in format "parent>child"
+ */
+async function processHierarchicalTag(db: D1Database, memoryId: string, hierarchicalTag: string): Promise<void> {
+  const parts = hierarchicalTag.split('>').map(part => part.trim()).filter(Boolean);
+  
+  if (parts.length !== 2) {
+    throw new Error(`Invalid hierarchical tag format: "${hierarchicalTag}". Expected format: "parent>child"`);
+  }
+
+  const [parentTagName, childTagName] = parts;
+
+  try {
+    // Use the service to create tags with relationship
+    const result = await TagHierarchyService.createTagsWithRelationship(
+      db,
+      childTagName,
+      parentTagName
+    );
+
+    // Link both tags to the memory
+    await linkTagToMemory(db, memoryId, result.child_tag.id);
+    await linkTagToMemory(db, memoryId, result.parent_tag.id);
+
+  } catch (error) {
+    // If relationship already exists, still link the tags to memory
+    if (error instanceof Error && error.message.includes('already exists')) {
+      // Get the existing tags and link them
+      const childTag = await TagHierarchyService.getTagByName(db, childTagName);
+      const parentTag = await TagHierarchyService.getTagByName(db, parentTagName);
+      
+      if (childTag) await linkTagToMemory(db, memoryId, childTag.id);
+      if (parentTag) await linkTagToMemory(db, memoryId, parentTag.id);
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Link tag to memory with duplicate handling
+ */
+async function linkTagToMemory(db: D1Database, memoryId: string, tagId: number): Promise<void> {
+  try {
+    await db.prepare(`
+      INSERT INTO memory_tags (memory_id, tag_id)
+      VALUES (?, ?)
+    `).bind(memoryId, tagId).run();
+  } catch (error) {
+    // Ignore duplicate key errors
+    if (error instanceof Error && !error.message.includes('UNIQUE constraint failed')) {
+      throw error;
     }
   }
 }
