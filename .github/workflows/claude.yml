@@ -27,7 +27,7 @@ jobs:
     steps:
 
       
-      - name: Checkout repository
+      - name: Checkout Claude Settings
         uses: actions/checkout@v4
         with:
           repository: 'PrashamTrivedi/claudeSettings'
@@ -35,12 +35,18 @@ jobs:
           fetch-depth: 1
           token: ${{ secrets.CLAUDE_PROMPTS_PAT }}
 
+      - name: Backup Claude Settings
+        run: |
+          cp -r .claude /tmp/claude-backup
 
-      - name: Checkout repository
+      - name: Checkout repository  
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          clean: false
+
+      - name: Restore Claude Settings
+        run: |
+          cp -r /tmp/claude-backup .claude
 
       - name: Run Claude Code
         id: claude
