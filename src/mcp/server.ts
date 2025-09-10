@@ -267,53 +267,42 @@ export function createMCPMemoryServer(env: Env): McpServer {
 }
 
 
-// Map to store transports by session ID for Cloudflare Workers
-const transports = new Map<string, StreamableHTTPServerTransport>()
 
 /**
  * Create HTTP handler for MCP server using official SDK Streamable HTTP transport
- * with fetch-to-node compatibility layer
+ * with fetch-to-node compatibility layer for Cloudflare Workers
  */
 export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
   try {
-    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
-    const {req, res} = toReqRes(request)
     // Handle CORS preflight
-    if (req.method === 'OPTIONS') {
+    if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 200,
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id',
+          'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id, MCP-Protocol-Version',
         },
       })
     }
 
-    let transport: StreamableHTTPServerTransport
-
-
-    transport = new StreamableHTTPServerTransport({
+    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
+    const {req, res} = toReqRes(request)
+    
+    // Create new transport for each request (stateless)
+    const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     })
 
     const server = createMCPMemoryServer(env)
     // Connect the transport to the MCP server
     await server.connect(transport)
+    
     // Read request body for POST requests
     const body = request.method === 'POST' ? await request.json() : null
 
     // Handle the request using the official SDK transport
     await transport.handleRequest(req, res, body)
-
-    // Set up onclose handler to clean up transport
-    transport.onclose = () => {
-      const sid = transport.sessionId
-      if (sid && transports.has(sid)) {
-        console.log(`Transport closed for session ${sid}`)
-        transports.delete(sid)
-      }
-    }
 
 
 
@@ -322,16 +311,15 @@ export async function handleMCPHttpRequest(env: Env, request: Request): Promise<
     // Convert Node.js response back to Cloudflare Response
     const fetchResponse = await toFetchResponse(res)
 
-    // // Add CORS headers
-    // const headers = new Headers(fetchResponse.headers);
-    // headers.set('Access-Control-Allow-Origin', '*');
+    // Add CORS headers
+    const headers = new Headers(fetchResponse.headers);
+    headers.set('Access-Control-Allow-Origin', '*');
 
-    // return new Response(fetchResponse.body, {
-    //   status: fetchResponse.status,
-    //   statusText: fetchResponse.statusText,
-    //   headers: headers,
-    // });
-    return fetchResponse
+    return new Response(fetchResponse.body, {
+      status: fetchResponse.status,
+      statusText: fetchResponse.statusText,
+      headers: headers,
+    });
 
   } catch (error) {
     console.error('MCP HTTP request error:', error)
