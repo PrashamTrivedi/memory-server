@@ -51,13 +51,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       tags: z.array(z.string()).optional().describe('Optional tags to associate with the memory'),
     },
     async (args) => {
-      const result = await handleAddMemory(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleAddMemory(env, args)
     }
   )
 
@@ -68,13 +62,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       id: z.string().describe('Memory ID to retrieve'),
     },
     async (args) => {
-      const result = await handleGetMemory(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleGetMemory(env, args)
     }
   )
 
@@ -87,13 +75,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       tags: z.array(z.string()).optional().describe('Filter by tags'),
     },
     async (args) => {
-      const result = await handleListMemories(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleListMemories(env, args)
     }
   )
 
@@ -104,13 +86,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       id: z.string().describe('Memory ID to delete'),
     },
     async (args) => {
-      const result = await handleDeleteMemory(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleDeleteMemory(env, args)
     }
   )
 
@@ -121,13 +97,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       id: z.string().optional().describe('Memory ID to update (optional, updates all if not provided)'),
     },
     async (args) => {
-      const result = await handleUpdateUrlContent(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleUpdateUrlContent(env, args)
     }
   )
 
@@ -141,13 +111,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       offset: z.number().optional().describe('Number of results to skip'),
     },
     async (args) => {
-      const result = await handleFindMemories(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleFindMemories(env, args)
     }
   )
 
@@ -159,13 +123,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       tags: z.array(z.string()).describe('Tags to add'),
     },
     async (args) => {
-      const result = await handleAddTags(env, args)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
-      }
+      return await handleAddTags(env, args)
     }
   )
 
