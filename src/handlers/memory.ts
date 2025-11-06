@@ -64,6 +64,10 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
     // Fetch the created memory with tags
     const memory = await getMemoryById(c.env.DB, id);
 
+    if (!memory) {
+      throw new MemoryNotFoundError(id);
+    }
+
     // Format response based on Accept header
     const markdown = formatMemoryAsMarkdown(memory);
     const jsonData = {
@@ -274,6 +278,10 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
     // Fetch updated memory
     const updatedMemory = await getMemoryById(c.env.DB, id);
 
+    if (!updatedMemory) {
+      throw new MemoryNotFoundError(id);
+    }
+
     // Format response based on Accept header
     const markdown = formatMemoryAsMarkdown(updatedMemory);
     const jsonData = {
@@ -388,7 +396,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     
     if (query && tagsParam) {
       // Search by both text and tags
-      const tags = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
       const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, limit, offset);
       memories = result.memories;
       total = result.total;
@@ -399,7 +407,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
       total = result.total;
     } else if (tagsParam) {
       // Search by tags only
-      const tags = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
       const result = await searchMemoriesByTags(c.env.DB, tags, limit, offset);
       memories = result.memories;
       total = result.total;
@@ -412,7 +420,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
       has_more: offset + limit < total
     };
 
-    const tags = tagsParam ? tagsParam.split(',').map(t => t.trim()).filter(Boolean) : undefined;
+    const tags = tagsParam ? tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined;
 
     // Format response based on Accept header
     const markdown = formatSearchResultsAsMarkdown(memories, query, tags, pagination);

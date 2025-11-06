@@ -8,9 +8,6 @@ import {
 import {
   AddParentRequest,
   TagHierarchyResponse,
-  AncestorsResponse,
-  DescendantsResponse,
-  TagTreeResponse,
   CreateTagsWithRelationshipRequest,
   CreateTagsWithRelationshipResponse
 } from '../../types/index';
@@ -186,10 +183,11 @@ export async function getAncestors(c: Context<{ Bindings: Env }>) {
     const ancestors = await TagHierarchyService.getAncestors(c.env.DB, tagId);
 
     // Get tag name for context
-    const tag = await TagHierarchyService.getTagById(c.env.DB, tagId);
+    const tagResult = await c.env.DB.prepare('SELECT name FROM tags WHERE id = ?').bind(tagId).first<{ name: string }>();
+    const tagName = tagResult?.name;
 
     // Format response based on Accept header
-    const markdown = formatTagListAsMarkdown('Ancestor Tags', ancestors, { id: tagId, name: tag?.name });
+    const markdown = formatTagListAsMarkdown('Ancestor Tags', ancestors, { id: tagId, name: tagName });
     const jsonData = {
       tag_id: tagId,
       ancestors
@@ -226,10 +224,11 @@ export async function getDescendants(c: Context<{ Bindings: Env }>) {
     const descendants = await TagHierarchyService.getDescendants(c.env.DB, tagId);
 
     // Get tag name for context
-    const tag = await TagHierarchyService.getTagById(c.env.DB, tagId);
+    const tagResult = await c.env.DB.prepare('SELECT name FROM tags WHERE id = ?').bind(tagId).first<{ name: string }>();
+    const tagName = tagResult?.name;
 
     // Format response based on Accept header
-    const markdown = formatTagListAsMarkdown('Descendant Tags', descendants, { id: tagId, name: tag?.name });
+    const markdown = formatTagListAsMarkdown('Descendant Tags', descendants, { id: tagId, name: tagName });
     const jsonData = {
       tag_id: tagId,
       descendants
@@ -287,10 +286,11 @@ export async function getImmediateParents(c: Context<{ Bindings: Env }>) {
     const parents = await TagHierarchyService.getImmediateParents(c.env.DB, tagId);
 
     // Get tag name for context
-    const tag = await TagHierarchyService.getTagById(c.env.DB, tagId);
+    const tagResult = await c.env.DB.prepare('SELECT name FROM tags WHERE id = ?').bind(tagId).first<{ name: string }>();
+    const tagName = tagResult?.name;
 
     // Format response based on Accept header
-    const markdown = formatTagListAsMarkdown('Immediate Parents', parents, { id: tagId, name: tag?.name });
+    const markdown = formatTagListAsMarkdown('Immediate Parents', parents, { id: tagId, name: tagName });
     const jsonData = {
       success: true,
       data: { tag_id: tagId, parents }
@@ -327,10 +327,11 @@ export async function getImmediateChildren(c: Context<{ Bindings: Env }>) {
     const children = await TagHierarchyService.getImmediateChildren(c.env.DB, tagId);
 
     // Get tag name for context
-    const tag = await TagHierarchyService.getTagById(c.env.DB, tagId);
+    const tagResult = await c.env.DB.prepare('SELECT name FROM tags WHERE id = ?').bind(tagId).first<{ name: string }>();
+    const tagName = tagResult?.name;
 
     // Format response based on Accept header
-    const markdown = formatTagListAsMarkdown('Immediate Children', children, { id: tagId, name: tag?.name });
+    const markdown = formatTagListAsMarkdown('Immediate Children', children, { id: tagId, name: tagName });
     const jsonData = {
       success: true,
       data: { tag_id: tagId, children }

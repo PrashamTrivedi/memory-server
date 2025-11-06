@@ -1,5 +1,4 @@
 import { Context } from 'hono';
-import type { Env } from '../index';
 
 /**
  * Utility to handle content negotiation for REST API responses
