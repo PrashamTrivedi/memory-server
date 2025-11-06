@@ -1,11 +1,16 @@
 import type { Env } from '../../index';
 import { v4 as uuidv4 } from 'uuid';
-import { 
-  Memory, 
-  CreateMemoryRequest, 
-  UpdateMemoryRequest 
+import {
+  Memory,
+  CreateMemoryRequest
 } from '../../../types/index';
 import { TagHierarchyService } from '../../services/tagHierarchy';
+import {
+  formatMemoryAsMarkdown,
+  formatMemoryListAsMarkdown,
+  formatSuccessResponse,
+  createDualFormatResponse
+} from '../utils/formatters.js';
 
 // Tool type definition
 interface Tool {
@@ -89,11 +94,15 @@ export async function handleAddMemory(env: Env, args: any): Promise<any> {
 
     // Fetch the created memory with tags
     const memory = await getMemoryById(env.DB, id);
-    
-    return {
+
+    // Format as markdown
+    const markdown = formatMemoryAsMarkdown(memory!);
+    const structuredData = {
       success: true,
       data: memory,
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to add memory: ${error instanceof Error ? error.message : String(error)}`);
@@ -142,16 +151,20 @@ export async function handleGetMemory(env: Env, args: any): Promise<any> {
         await env.DB.prepare(`
           UPDATE memories SET content = ?, updated_at = ? WHERE id = ?
         `).bind(updatedContent, Math.floor(Date.now() / 1000), id).run();
-        
+
         memory.content = updatedContent;
         memory.updated_at = Math.floor(Date.now() / 1000);
       }
     }
 
-    return {
+    // Format as markdown
+    const markdown = formatMemoryAsMarkdown(memory);
+    const structuredData = {
       success: true,
       data: memory,
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to get memory: ${error instanceof Error ? error.message : String(error)}`);
@@ -218,19 +231,25 @@ export async function handleListMemories(env: Env, args: any): Promise<any> {
         updated_at: row.updated_at
       });
     }
-    
-    return {
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format as markdown
+    const markdown = formatMemoryListAsMarkdown(memories, pagination);
+    const structuredData = {
       success: true,
       data: {
         memories,
-        pagination: {
-          total,
-          limit,
-          offset,
-          has_more: offset + limit < total
-        }
+        pagination
       }
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to list memories: ${error instanceof Error ? error.message : String(error)}`);
@@ -273,10 +292,17 @@ export async function handleDeleteMemory(env: Env, args: any): Promise<any> {
     // Delete memory (cascade will handle memory_tags)
     await env.DB.prepare('DELETE FROM memories WHERE id = ?').bind(id).run();
 
-    return {
+    // Format as markdown
+    const markdown = formatSuccessResponse(
+      `Memory "${memory.name}" has been deleted successfully.`,
+      { id, name: memory.name }
+    );
+    const structuredData = {
       success: true,
       data: { deleted: true, id }
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to delete memory: ${error instanceof Error ? error.message : String(error)}`);
@@ -347,18 +373,22 @@ export async function handleUpdateUrlContent(env: Env, args: any): Promise<any> 
     // Update memory with new content
     const updatedContent = `${originalContent}\n\n--- URL Content ---\n${urlContent}`;
     const now = Math.floor(Date.now() / 1000);
-    
+
     await env.DB.prepare(`
       UPDATE memories SET content = ?, updated_at = ? WHERE id = ?
     `).bind(updatedContent, now, id).run();
 
     // Return updated memory
     const updatedMemory = await getMemoryById(env.DB, id);
-    
-    return {
+
+    // Format as markdown
+    const markdown = formatMemoryAsMarkdown(updatedMemory!);
+    const structuredData = {
       success: true,
       data: updatedMemory,
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to update URL content: ${error instanceof Error ? error.message : String(error)}`);

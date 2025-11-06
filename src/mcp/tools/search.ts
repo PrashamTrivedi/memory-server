@@ -1,5 +1,10 @@
 import type { Env } from '../../index';
 import { Memory } from '../../../types/index';
+import {
+  formatSearchResultsAsMarkdown,
+  formatMemoryAsMarkdown,
+  createDualFormatResponse
+} from '../utils/formatters.js';
 
 // Tool type definition
 interface Tool {
@@ -61,7 +66,7 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
 
     let memories: Memory[] = [];
     let total = 0;
-    
+
     if (query && tags && tags.length > 0) {
       // Search by both text and tags
       const result = await searchMemoriesByQueryAndTags(env.DB, query, tags, limit, offset);
@@ -78,21 +83,27 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
       memories = result.memories;
       total = result.total;
     }
-    
-    return {
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format as markdown
+    const markdown = formatSearchResultsAsMarkdown(memories, query, tags, pagination);
+    const structuredData = {
       success: true,
       data: {
         memories,
-        pagination: {
-          total,
-          limit,
-          offset,
-          has_more: offset + limit < total
-        },
+        pagination,
         query: query || undefined,
         tags: tags || undefined
       }
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to find memories: ${error instanceof Error ? error.message : String(error)}`);
@@ -153,11 +164,15 @@ export async function handleAddTags(env: Env, args: any): Promise<any> {
 
     // Return updated memory with all tags
     const updatedMemory = await getMemoryById(env.DB, memoryId);
-    
-    return {
+
+    // Format as markdown
+    const markdown = formatMemoryAsMarkdown(updatedMemory!);
+    const structuredData = {
       success: true,
       data: updatedMemory,
     };
+
+    return createDualFormatResponse(markdown, structuredData);
 
   } catch (error) {
     throw new Error(`Failed to add tags: ${error instanceof Error ? error.message : String(error)}`);
