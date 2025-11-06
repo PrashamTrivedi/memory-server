@@ -116,6 +116,71 @@ with Claude Desktop, MCP Inspector, and other MCP clients.
 
 **Note:** This server currently runs without authentication - ensure you deploy it in a secure environment and consider adding authentication for production use.
 
+### Response Format
+
+All MCP tool responses are returned in a dual-format response pattern optimized for AI agent comprehension:
+
+- **Markdown Format**: Human-readable formatted output for direct interpretation by AI agents and users
+- **JSON Format**: Structured machine-parsable data for programmatic integration
+
+This dual-format approach ensures that responses are both easily understood by language models and provide clean structured data for downstream processing.
+
+#### Understanding Dual-Format Responses
+
+Each MCP tool returns an MCP response containing two content items:
+
+**Example Response Structure:**
+```
+MCP Response
+├─ Content Item 1: Markdown Text
+│  └─ Formatted for human/AI readability with headers, lists, metadata
+└─ Content Item 2: JSON with MIME type
+   └─ Complete structured data with full information density
+```
+
+**Markdown Benefits:**
+- Clear visual hierarchy with formatted headers
+- Content previews for better AI comprehension
+- Pagination and result summaries for context
+- Natural language formatting for agent interpretation
+
+**JSON Benefits:**
+- Complete data preservation (IDs, timestamps, pagination metadata)
+- Enables downstream tool integration and data extraction
+- Maintains strict data types and structures
+- Supports programmatic processing
+
+**Example Memory Response:**
+
+Markdown (Human-readable):
+```
+# Memory: React Hooks Guide
+
+Comprehensive guide to React hooks...
+
+## Metadata
+- **ID**: abc-123-def
+- **Tags**: programming, javascript, react
+- **URL**: https://react.dev/hooks
+- **Updated**: Nov 06, 2025 14:30:45
+```
+
+JSON (Machine-parsable):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "abc-123-def",
+    "name": "React Hooks Guide",
+    "content": "Comprehensive guide...",
+    "tags": ["programming", "javascript", "react"],
+    "url": "https://react.dev/hooks",
+    "created_at": 1730898645,
+    "updated_at": 1730898645
+  }
+}
+```
+
 ### Connection Setup
 
 #### For Local Development
@@ -142,7 +207,7 @@ https://your-worker-subdomain.your-subdomain.workers.dev/mcp
 
 ### Available MCP Tools
 
-The server exposes 7 memory management tools via MCP:
+The server exposes 7 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
 
 #### Core Memory Tools
 
@@ -150,7 +215,7 @@ The server exposes 7 memory management tools via MCP:
 
 ```json
 {
-  "name": "My Development Note", 
+  "name": "My Development Note",
   "content": "Important information about React hooks",
   "url": "https://react.dev/hooks",
   "tags": ["programming>javascript", "frontend>react", "tutorial"]
@@ -158,6 +223,8 @@ The server exposes 7 memory management tools via MCP:
 ```
 
 *Supports hierarchical tags using "parent>child" format alongside simple tags*
+
+Response includes human-readable memory details in markdown and complete memory object with metadata in JSON format.
 
 **`get_memory`** - Retrieve specific memory
 
@@ -196,6 +263,8 @@ The server exposes 7 memory management tools via MCP:
   "limit": 5
 }
 ```
+
+Returns formatted search results with matching memories, search criteria summary, and pagination information in dual-format response.
 
 **`update_url_content`** - Refresh URL content
 

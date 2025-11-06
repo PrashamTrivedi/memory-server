@@ -54,6 +54,13 @@ function truncateContent(content: string, maxLength: number = 200): string {
 
 /**
  * Format a single memory as markdown
+ *
+ * Converts a Memory object into human-readable markdown format suitable
+ * for AI agent interpretation. Includes memory content, metadata (ID, tags, URL),
+ * and formatted timestamps.
+ *
+ * @param memory - Memory object to format
+ * @returns Markdown-formatted string representation
  */
 export function formatMemoryAsMarkdown(memory: Memory): string {
   const markdown = `# Memory: ${memory.name}
@@ -72,6 +79,14 @@ ${memory.content}
 
 /**
  * Format a list of memories as markdown with pagination
+ *
+ * Converts multiple Memory objects into a paginated markdown format.
+ * Truncates content previews for readability and includes pagination metadata
+ * to show result position and availability.
+ *
+ * @param memories - Array of Memory objects to format
+ * @param pagination - Pagination metadata (total, offset, limit, has_more)
+ * @returns Markdown-formatted string with memory list and pagination info
  */
 export function formatMemoryListAsMarkdown(
   memories: Memory[],
@@ -114,6 +129,16 @@ ${contentPreview}
 
 /**
  * Format search results as markdown
+ *
+ * Converts search results into markdown format with query and tag filters displayed.
+ * Similar to list formatting but emphasizes search context and criteria.
+ * Handles no-results case gracefully.
+ *
+ * @param memories - Array of Memory objects matching search criteria
+ * @param query - Optional full-text search query string
+ * @param tags - Optional array of tag filters applied
+ * @param pagination - Pagination metadata for result set
+ * @returns Markdown-formatted search results with context
  */
 export function formatSearchResultsAsMarkdown(
   memories: Memory[],
@@ -171,6 +196,13 @@ ${contentPreview}
 
 /**
  * Format a success response as markdown
+ *
+ * Creates a success message with optional data details in markdown format.
+ * Useful for action confirmations (create, delete, update) with relevant metadata.
+ *
+ * @param message - Success message to display
+ * @param data - Optional data object with operation details
+ * @returns Markdown-formatted success response
  */
 export function formatSuccessResponse(message: string, data?: any): string {
   let markdown = `✅ Success
@@ -197,6 +229,13 @@ ${message}`;
 
 /**
  * Format an error response as markdown
+ *
+ * Creates an error message with optional error details in markdown format.
+ * Useful for communicating failures in a user-friendly way.
+ *
+ * @param error - Error message summarizing the issue
+ * @param details - Optional detailed error information
+ * @returns Markdown-formatted error response
  */
 export function formatErrorResponse(error: string, details?: string): string {
   let markdown = `❌ Error
@@ -214,9 +253,30 @@ ${details}`;
 /**
  * Create a dual-format MCP response with both markdown and structured JSON
  *
- * This provides:
- * 1. Human-readable markdown text for AI agents and humans
- * 2. Machine-parsable JSON for programmatic access
+ * Response Format Strategy:
+ * This implements a dual-format response pattern for optimal MCP tool integration
+ * with AI language models and agents.
+ *
+ * 1. Markdown Format (First Content Item):
+ *    - Human-readable output optimized for language model interpretation
+ *    - Includes formatted headers, lists, and visual structure
+ *    - Designed for direct inclusion in AI agent reasoning and responses
+ *    - Provides clear context and data hierarchy
+ *
+ * 2. JSON Format (Second Content Item):
+ *    - Structured machine-parsable data with full metadata
+ *    - Preserves complete information (IDs, timestamps, pagination, etc.)
+ *    - Enables programmatic access and integration with tools
+ *    - Maintains data integrity for downstream processing
+ *
+ * Usage:
+ * - Language models primarily interpret the markdown for understanding
+ * - Tools can extract structured data from JSON for integration
+ * - Both formats maintain consistency and complementary information
+ *
+ * @param markdownText - Human-readable markdown formatted response
+ * @param structuredData - Complete structured data in object form
+ * @returns MCPToolResponse with dual-format content items
  */
 export function createDualFormatResponse(
   markdownText: string,
