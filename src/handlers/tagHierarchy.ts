@@ -30,26 +30,17 @@ export async function createTagsWithRelationship(c: Context<{ Bindings: Env }>) 
     
     // Validate required fields
     if (!body.child_tag_name || !body.parent_tag_name) {
-      return c.json<CreateTagsWithRelationshipResponse>({
-        success: false,
-        error: 'Missing required fields: child_tag_name and parent_tag_name are required'
-      }, 400);
+      return returnValidationError(c, 'Missing required fields: child_tag_name and parent_tag_name are required');
     }
 
     // Validate tag names are not empty strings
     if (!body.child_tag_name.trim() || !body.parent_tag_name.trim()) {
-      return c.json<CreateTagsWithRelationshipResponse>({
-        success: false,
-        error: 'Tag names cannot be empty'
-      }, 400);
+      return returnValidationError(c, 'Tag names cannot be empty');
     }
 
     // Prevent self-reference
     if (body.child_tag_name.trim() === body.parent_tag_name.trim()) {
-      return c.json<CreateTagsWithRelationshipResponse>({
-        success: false,
-        error: 'A tag cannot be its own parent'
-      }, 400);
+      return returnValidationError(c, 'A tag cannot be its own parent');
     }
 
     const result = await TagHierarchyService.createTagsWithRelationship(
@@ -79,21 +70,15 @@ export async function createTagsWithRelationship(c: Context<{ Bindings: Env }>) 
 export async function addParent(c: Context<{ Bindings: Env }>) {
   try {
     const childTagId = parseInt(c.req.param('id'));
-    
+
     if (isNaN(childTagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid child tag ID'
-      }, 400);
+      return returnValidationError(c, 'Invalid child tag ID');
     }
 
     const body = await c.req.json<AddParentRequest>();
-    
+
     if (!body.parent_tag_id || isNaN(body.parent_tag_id)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid or missing parent_tag_id'
-      }, 400);
+      return returnValidationError(c, 'Invalid or missing parent_tag_id');
     }
 
     const hierarchy = await TagHierarchyService.addParent(
@@ -126,10 +111,7 @@ export async function removeParent(c: Context<{ Bindings: Env }>) {
     const parentTagId = parseInt(c.req.param('parentId'));
 
     if (isNaN(childTagId) || isNaN(parentTagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid tag IDs'
-      }, 400);
+      return returnValidationError(c, 'Invalid tag IDs');
     }
 
     const removed = await TagHierarchyService.removeParent(
@@ -139,10 +121,7 @@ export async function removeParent(c: Context<{ Bindings: Env }>) {
     );
 
     if (!removed) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Parent relationship not found'
-      }, 404);
+      return returnValidationError(c, 'Parent relationship not found', 404);
     }
 
     // Format response based on Accept header
@@ -168,10 +147,7 @@ export async function getAncestors(c: Context<{ Bindings: Env }>) {
     const tagId = parseInt(c.req.param('id'));
 
     if (isNaN(tagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid tag ID'
-      }, 400);
+      return returnValidationError(c, 'Invalid tag ID');
     }
 
     // Verify tag exists
@@ -209,10 +185,7 @@ export async function getDescendants(c: Context<{ Bindings: Env }>) {
     const tagId = parseInt(c.req.param('id'));
 
     if (isNaN(tagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid tag ID'
-      }, 400);
+      return returnValidationError(c, 'Invalid tag ID');
     }
 
     // Verify tag exists
@@ -271,10 +244,7 @@ export async function getImmediateParents(c: Context<{ Bindings: Env }>) {
     const tagId = parseInt(c.req.param('id'));
 
     if (isNaN(tagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid tag ID'
-      }, 400);
+      return returnValidationError(c, 'Invalid tag ID');
     }
 
     // Verify tag exists
@@ -312,10 +282,7 @@ export async function getImmediateChildren(c: Context<{ Bindings: Env }>) {
     const tagId = parseInt(c.req.param('id'));
 
     if (isNaN(tagId)) {
-      return c.json<TagHierarchyResponse>({
-        success: false,
-        error: 'Invalid tag ID'
-      }, 400);
+      return returnValidationError(c, 'Invalid tag ID');
     }
 
     // Verify tag exists
@@ -342,6 +309,23 @@ export async function getImmediateChildren(c: Context<{ Bindings: Env }>) {
   } catch (error) {
     return handleTagHierarchyError(error, c);
   }
+}
+
+/**
+ * Return validation error with proper content negotiation
+ */
+function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: string, statusCode: number = 400) {
+  if (prefersMarkdown(c)) {
+    const markdown = formatErrorResponse(errorMessage);
+    return c.text(markdown, statusCode, {
+      'Content-Type': 'text/markdown; charset=utf-8'
+    });
+  }
+
+  return c.json<TagHierarchyResponse>({
+    success: false,
+    error: errorMessage
+  }, statusCode);
 }
 
 /**

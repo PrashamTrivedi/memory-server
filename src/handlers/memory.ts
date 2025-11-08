@@ -29,10 +29,7 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
     
     // Validate required fields
     if (!body.name || !body.content) {
-      return c.json({
-        success: false,
-        error: 'Missing required fields: name and content are required'
-      }, 400);
+      return returnValidationError(c, 'Missing required fields: name and content are required');
     }
 
     // Generate UUID for new memory
@@ -89,12 +86,9 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
 export async function getMemory(c: Context<{ Bindings: Env }>) {
   try {
     const id = c.req.param('id');
-    
+
     if (!id) {
-      return c.json({
-        success: false,
-        error: 'Memory ID is required'
-      }, 400);
+      return returnValidationError(c, 'Memory ID is required');
     }
 
     const memory = await getMemoryById(c.env.DB, id);
@@ -245,10 +239,7 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
     }
     
     if (updates.length === 0 && !body.tags) {
-      return c.json({
-        success: false,
-        error: 'No fields to update'
-      }, 400);
+      return returnValidationError(c, 'No fields to update');
     }
 
     // Update memory if there are field changes
@@ -303,12 +294,9 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
 export async function deleteMemory(c: Context<{ Bindings: Env }>) {
   try {
     const id = c.req.param('id');
-    
+
     if (!id) {
-      return c.json({
-        success: false,
-        error: 'Memory ID is required'
-      }, 400);
+      return returnValidationError(c, 'Memory ID is required');
     }
 
     // Verify memory exists
@@ -385,10 +373,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     const offset = parseInt(c.req.query('offset') || '0');
     
     if (!query && !tagsParam) {
-      return c.json({
-        success: false,
-        error: 'Either query or tags parameter is required'
-      }, 400);
+      return returnValidationError(c, 'Either query or tags parameter is required');
     }
 
     let memories: Memory[] = [];
@@ -804,6 +789,23 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     memories,
     total: countResult?.count || 0
   };
+}
+
+/**
+ * Return validation error with proper content negotiation
+ */
+function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: string, statusCode: number = 400) {
+  if (prefersMarkdown(c)) {
+    const markdown = formatErrorResponse(errorMessage);
+    return c.text(markdown, statusCode, {
+      'Content-Type': 'text/markdown; charset=utf-8'
+    });
+  }
+
+  return c.json({
+    success: false,
+    error: errorMessage
+  }, statusCode);
 }
 
 /**
