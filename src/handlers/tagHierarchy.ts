@@ -8,8 +8,7 @@ import {
 import {
   AddParentRequest,
   TagHierarchyResponse,
-  CreateTagsWithRelationshipRequest,
-  CreateTagsWithRelationshipResponse
+  CreateTagsWithRelationshipRequest
 } from '../../types/index';
 import { sendFormattedResponse, prefersMarkdown } from '../utils/responseFormatter';
 import {
@@ -317,7 +316,7 @@ export async function getImmediateChildren(c: Context<{ Bindings: Env }>) {
 function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: string, statusCode: number = 400) {
   if (prefersMarkdown(c)) {
     const markdown = formatErrorResponse(errorMessage);
-    return c.text(markdown, statusCode, {
+    return c.text(markdown, statusCode as any, {
       'Content-Type': 'text/markdown; charset=utf-8'
     });
   }
@@ -325,7 +324,7 @@ function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: stri
   return c.json<TagHierarchyResponse>({
     success: false,
     error: errorMessage
-  }, statusCode);
+  }, statusCode as any);
 }
 
 /**
@@ -357,7 +356,7 @@ function handleTagHierarchyError(error: unknown, c: Context<{ Bindings: Env }>) 
   // Format response based on Accept header
   if (prefersMarkdown(c)) {
     const markdown = formatErrorResponse(errorMessage);
-    return c.text(markdown, statusCode, {
+    return c.text(markdown, statusCode as any, {
       'Content-Type': 'text/markdown; charset=utf-8'
     });
   }
@@ -365,5 +364,5 @@ function handleTagHierarchyError(error: unknown, c: Context<{ Bindings: Env }>) 
   return c.json<TagHierarchyResponse>({
     success: false,
     error: errorMessage
-  }, statusCode);
+  }, statusCode as any);
 }

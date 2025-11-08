@@ -797,7 +797,7 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
 function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: string, statusCode: number = 400) {
   if (prefersMarkdown(c)) {
     const markdown = formatErrorResponse(errorMessage);
-    return c.text(markdown, statusCode, {
+    return c.text(markdown, statusCode as any, {
       'Content-Type': 'text/markdown; charset=utf-8'
     });
   }
@@ -805,7 +805,7 @@ function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: stri
   return c.json({
     success: false,
     error: errorMessage
-  }, statusCode);
+  }, statusCode as any);
 }
 
 /**
@@ -834,7 +834,7 @@ function handleMemoryError(error: unknown, c: Context<{ Bindings: Env }>) {
   // Format response based on Accept header
   if (prefersMarkdown(c)) {
     const markdown = formatErrorResponse(errorMessage);
-    return c.text(markdown, statusCode, {
+    return c.text(markdown, statusCode as any, {
       'Content-Type': 'text/markdown; charset=utf-8'
     });
   }
@@ -842,5 +842,5 @@ function handleMemoryError(error: unknown, c: Context<{ Bindings: Env }>) {
   return c.json({
     success: false,
     error: errorMessage
-  }, statusCode);
+  }, statusCode as any);
 }

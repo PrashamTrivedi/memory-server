@@ -28,10 +28,10 @@ export function sendFormattedResponse(
   statusCode: number = 200
 ) {
   if (prefersMarkdown(c)) {
-    return c.text(markdownText, statusCode, {
+    return c.text(markdownText, statusCode as any, {
       'Content-Type': 'text/markdown; charset=utf-8'
     });
   }
 
-  return c.json(jsonData, statusCode);
+  return c.json(jsonData, statusCode as any);
 }
