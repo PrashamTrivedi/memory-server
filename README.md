@@ -380,12 +380,29 @@ Add to your Claude Desktop configuration:
 
 ### REST API
 
+All REST API endpoints support both JSON and Markdown response formats via content negotiation. Use the `Accept` header to specify your preferred format:
+
+- `Accept: application/json` - Returns JSON (default)
+- `Accept: text/markdown` - Returns formatted Markdown
+
+**Example:**
+```bash
+# JSON Response (default)
+curl http://localhost:8787/api/memories
+
+# Markdown Response
+curl http://localhost:8787/api/memories \
+  -H "Accept: text/markdown"
+```
+
 #### Memory Management
 - `GET /api/memories` - List memories
 - `POST /api/memories` - Create memory (supports hierarchical tags)
 - `GET /api/memories/{id}` - Get memory
 - `PUT /api/memories/{id}` - Update memory (supports hierarchical tags)
 - `DELETE /api/memories/{id}` - Delete memory
+- `GET /api/memories/stats` - Get memory statistics
+- `GET /api/memories/search` - Search memories
 
 #### Tag Hierarchy Management
 - `POST /api/tags/create-with-parent` - Create parent-child tag relationship
@@ -396,6 +413,42 @@ Add to your Claude Desktop configuration:
 - `GET /api/tags/{id}/children` - Get immediate child tags
 - `POST /api/tags/{id}/parent` - Add parent relationship
 - `DELETE /api/tags/{id}/parent/{parentId}` - Remove parent relationship
+
+### Response Format Examples
+
+#### JSON Format (Default)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "abc-123-def",
+    "name": "React Hooks Guide",
+    "content": "Comprehensive guide to React hooks...",
+    "tags": ["programming", "javascript", "react"],
+    "url": "https://react.dev/hooks",
+    "created_at": 1730898645,
+    "updated_at": 1730898645
+  }
+}
+```
+
+#### Markdown Format (Accept: text/markdown)
+
+```markdown
+# Memory: React Hooks Guide
+
+Comprehensive guide to React hooks...
+
+## Metadata
+- **ID**: abc-123-def
+- **Tags**: programming, javascript, react
+- **URL**: https://react.dev/hooks
+- **Created**: Nov 06, 2025 14:30:45
+- **Updated**: Nov 06, 2025 14:30:45
+```
+
+The Markdown format provides a human-readable, AI-friendly representation of the data, while the JSON format maintains complete structured information. Both formats are backward compatible, with JSON remaining the default when no `Accept` header is specified.
 
 ### MCP Endpoint
 
