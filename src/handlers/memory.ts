@@ -9,6 +9,15 @@ import {
 } from '../../types/index';
 import { MemoryError, MemoryNotFoundError } from '../errors/memoryErrors';
 import { TagHierarchyService } from '../services/tagHierarchy';
+import { sendFormattedResponse, prefersMarkdown } from '../utils/responseFormatter';
+import {
+  formatMemoryAsMarkdown,
+  formatMemoryListAsMarkdown,
+  formatSearchResultsAsMarkdown,
+  formatSuccessResponse,
+  formatStatsAsMarkdown,
+  formatErrorResponse
+} from '../mcp/utils/formatters';
 
 /**
  * Create a new memory
@@ -20,10 +29,7 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
     
     // Validate required fields
     if (!body.name || !body.content) {
-      return c.json({
-        success: false,
-        error: 'Missing required fields: name and content are required'
-      }, 400);
+      return returnValidationError(c, 'Missing required fields: name and content are required');
     }
 
     // Generate UUID for new memory
@@ -54,11 +60,19 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
 
     // Fetch the created memory with tags
     const memory = await getMemoryById(c.env.DB, id);
-    
-    return c.json({
+
+    if (!memory) {
+      throw new MemoryNotFoundError(id);
+    }
+
+    // Format response based on Accept header
+    const markdown = formatMemoryAsMarkdown(memory);
+    const jsonData = {
       success: true,
       data: memory
-    }, 201);
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData, 201);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -72,12 +86,9 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
 export async function getMemory(c: Context<{ Bindings: Env }>) {
   try {
     const id = c.req.param('id');
-    
+
     if (!id) {
-      return c.json({
-        success: false,
-        error: 'Memory ID is required'
-      }, 400);
+      return returnValidationError(c, 'Memory ID is required');
     }
 
     const memory = await getMemoryById(c.env.DB, id);
@@ -101,10 +112,14 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
       }
     }
 
-    return c.json({
+    // Format response based on Accept header
+    const markdown = formatMemoryAsMarkdown(memory);
+    const jsonData = {
       success: true,
       data: memory
-    });
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -148,19 +163,25 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
         updated_at: row.updated_at
       });
     }
-    
-    return c.json({
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format response based on Accept header
+    const markdown = formatMemoryListAsMarkdown(memories, pagination);
+    const jsonData = {
       success: true,
       data: {
         memories,
-        pagination: {
-          total,
-          limit,
-          offset,
-          has_more: offset + limit < total
-        }
+        pagination
       }
-    });
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -218,10 +239,7 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
     }
     
     if (updates.length === 0 && !body.tags) {
-      return c.json({
-        success: false,
-        error: 'No fields to update'
-      }, 400);
+      return returnValidationError(c, 'No fields to update');
     }
 
     // Update memory if there are field changes
@@ -250,11 +268,19 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
 
     // Fetch updated memory
     const updatedMemory = await getMemoryById(c.env.DB, id);
-    
-    return c.json({
+
+    if (!updatedMemory) {
+      throw new MemoryNotFoundError(id);
+    }
+
+    // Format response based on Accept header
+    const markdown = formatMemoryAsMarkdown(updatedMemory);
+    const jsonData = {
       success: true,
       data: updatedMemory
-    });
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -268,12 +294,9 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
 export async function deleteMemory(c: Context<{ Bindings: Env }>) {
   try {
     const id = c.req.param('id');
-    
+
     if (!id) {
-      return c.json({
-        success: false,
-        error: 'Memory ID is required'
-      }, 400);
+      return returnValidationError(c, 'Memory ID is required');
     }
 
     // Verify memory exists
@@ -285,10 +308,14 @@ export async function deleteMemory(c: Context<{ Bindings: Env }>) {
     // Delete memory (cascade will handle memory_tags)
     await c.env.DB.prepare('DELETE FROM memories WHERE id = ?').bind(id).run();
 
-    return c.json({
+    // Format response based on Accept header
+    const markdown = formatSuccessResponse(`Memory deleted successfully`, { id, deleted: true });
+    const jsonData = {
       success: true,
       data: { deleted: true, id }
-    });
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -313,16 +340,22 @@ export async function getMemoryStats(c: Context<{ Bindings: Env }>) {
     // Get tagged count
     const taggedResult = await c.env.DB.prepare('SELECT COUNT(DISTINCT memory_id) as count FROM memory_tags').first<{ count: number }>();
     const tagged = taggedResult?.count || 0;
-    
-    return c.json({
+
+    const stats = {
+      total,
+      recent,
+      tagged
+    };
+
+    // Format response based on Accept header
+    const markdown = formatStatsAsMarkdown(stats);
+    const jsonData = {
       success: true,
-      data: {
-        total,
-        recent,
-        tagged
-      }
-    });
-    
+      data: stats
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
+
   } catch (error) {
     return handleMemoryError(error, c);
   }
@@ -340,10 +373,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     const offset = parseInt(c.req.query('offset') || '0');
     
     if (!query && !tagsParam) {
-      return c.json({
-        success: false,
-        error: 'Either query or tags parameter is required'
-      }, 400);
+      return returnValidationError(c, 'Either query or tags parameter is required');
     }
 
     let memories: Memory[] = [];
@@ -351,7 +381,7 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     
     if (query && tagsParam) {
       // Search by both text and tags
-      const tags = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
       const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, limit, offset);
       memories = result.memories;
       total = result.total;
@@ -362,26 +392,34 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
       total = result.total;
     } else if (tagsParam) {
       // Search by tags only
-      const tags = tagsParam.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
       const result = await searchMemoriesByTags(c.env.DB, tags, limit, offset);
       memories = result.memories;
       total = result.total;
     }
-    
-    return c.json({
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    const tags = tagsParam ? tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined;
+
+    // Format response based on Accept header
+    const markdown = formatSearchResultsAsMarkdown(memories, query, tags, pagination);
+    const jsonData = {
       success: true,
       data: {
         memories,
-        pagination: {
-          total,
-          limit,
-          offset,
-          has_more: offset + limit < total
-        },
+        pagination,
         query: query || undefined,
-        tags: tagsParam ? tagsParam.split(',').map(t => t.trim()).filter(Boolean) : undefined
+        tags
       }
-    });
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
 
   } catch (error) {
     return handleMemoryError(error, c);
@@ -754,38 +792,55 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
 }
 
 /**
+ * Return validation error with proper content negotiation
+ */
+function returnValidationError(c: Context<{ Bindings: Env }>, errorMessage: string, statusCode: number = 400) {
+  if (prefersMarkdown(c)) {
+    const markdown = formatErrorResponse(errorMessage);
+    return c.text(markdown, statusCode as any, {
+      'Content-Type': 'text/markdown; charset=utf-8'
+    });
+  }
+
+  return c.json({
+    success: false,
+    error: errorMessage
+  }, statusCode as any);
+}
+
+/**
  * Centralized error handling for memory operations
  */
 function handleMemoryError(error: unknown, c: Context<{ Bindings: Env }>) {
   console.error('Memory operation error:', error);
 
+  let errorMessage = 'Internal server error';
+  let statusCode = 500;
+
   if (error instanceof MemoryError) {
-    return c.json({
-      success: false,
-      error: error.message
-    }, error.statusCode as any);
-  }
-
-  // Handle database constraint violations
-  if (error instanceof Error) {
+    errorMessage = error.message;
+    statusCode = error.statusCode as any;
+  } else if (error instanceof Error) {
+    // Handle database constraint violations
     if (error.message.includes('UNIQUE constraint failed') && error.message.includes('memories.name')) {
-      return c.json({
-        success: false,
-        error: 'A memory with this name already exists'
-      }, 409);
-    }
-
-    if (error.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({
-        success: false,
-        error: 'Invalid reference to related data'
-      }, 400);
+      errorMessage = 'A memory with this name already exists';
+      statusCode = 409;
+    } else if (error.message.includes('FOREIGN KEY constraint failed')) {
+      errorMessage = 'Invalid reference to related data';
+      statusCode = 400;
     }
   }
 
-  // Generic error fallback
+  // Format response based on Accept header
+  if (prefersMarkdown(c)) {
+    const markdown = formatErrorResponse(errorMessage);
+    return c.text(markdown, statusCode as any, {
+      'Content-Type': 'text/markdown; charset=utf-8'
+    });
+  }
+
   return c.json({
     success: false,
-    error: 'Internal server error'
-  }, 500);
+    error: errorMessage
+  }, statusCode as any);
 }

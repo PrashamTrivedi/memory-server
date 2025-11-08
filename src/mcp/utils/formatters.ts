@@ -296,3 +296,125 @@ export function createDualFormatResponse(
     ]
   };
 }
+
+/**
+ * Tag interfaces for REST API markdown formatters
+ */
+export interface Tag {
+  id: number;
+  name: string;
+}
+
+export interface TagTreeNode {
+  id: number;
+  name: string;
+  children: TagTreeNode[];
+  parents?: TagTreeNode[];
+}
+
+/**
+ * Format tag hierarchy relationship as markdown
+ */
+export function formatTagRelationshipAsMarkdown(data: {
+  child_tag: Tag;
+  parent_tag: Tag;
+  relationship_created?: boolean;
+}): string {
+  const markdown = `# Tag Relationship Created
+
+**Parent Tag**: ${data.parent_tag.name} (ID: ${data.parent_tag.id})
+**Child Tag**: ${data.child_tag.name} (ID: ${data.child_tag.id})
+
+## Hierarchy
+\`\`\`
+${data.parent_tag.name}
+└── ${data.child_tag.name}
+\`\`\`
+
+The hierarchical relationship has been established successfully.`;
+
+  return markdown;
+}
+
+/**
+ * Format tag tree as markdown
+ */
+export function formatTagTreeAsMarkdown(tree: TagTreeNode[]): string {
+  let markdown = `# Tag Hierarchy Tree
+
+`;
+
+  function renderTree(nodes: TagTreeNode[], depth: number = 0): string {
+    let result = '';
+    const indent = '  '.repeat(depth);
+
+    for (const node of nodes) {
+      result += `${indent}- **${node.name}** (ID: ${node.id})`;
+
+      if (node.children && node.children.length > 0) {
+        result += '\n';
+        result += renderTree(node.children, depth + 1);
+      } else {
+        result += '\n';
+      }
+    }
+
+    return result;
+  }
+
+  if (tree.length === 0) {
+    markdown += 'No tags found in the hierarchy.\n';
+  } else {
+    markdown += renderTree(tree);
+  }
+
+  return markdown;
+}
+
+/**
+ * Format tag list (ancestors/descendants) as markdown
+ */
+export function formatTagListAsMarkdown(
+  title: string,
+  tags: Tag[],
+  contextTag?: { id: number; name?: string }
+): string {
+  let markdown = `# ${title}
+
+`;
+
+  if (contextTag) {
+    markdown += `Reference Tag: **${contextTag.name || `ID ${contextTag.id}`}**\n\n`;
+  }
+
+  if (tags.length === 0) {
+    markdown += 'No tags found.\n';
+  } else {
+    markdown += `Found ${tags.length} tag${tags.length === 1 ? '' : 's'}:\n\n`;
+
+    tags.forEach((tag, index) => {
+      markdown += `${index + 1}. **${tag.name}** (ID: ${tag.id})\n`;
+    });
+  }
+
+  return markdown;
+}
+
+/**
+ * Format stats response as markdown
+ */
+export function formatStatsAsMarkdown(stats: {
+  total: number;
+  recent: number;
+  tagged: number;
+}): string {
+  return `# Memory Statistics
+
+- **Total Memories**: ${stats.total}
+- **Recent Memories** (last 30 days): ${stats.recent}
+- **Tagged Memories**: ${stats.tagged}
+- **Untagged Memories**: ${stats.total - stats.tagged}
+
+## Summary
+${stats.total === 0 ? 'No memories stored yet.' : `You have ${stats.total} memories, with ${Math.round((stats.tagged / stats.total) * 100)}% tagged.`}`;
+}

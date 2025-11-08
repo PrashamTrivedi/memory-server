@@ -170,6 +170,10 @@ interface CachedURLContent {
 
 ### RESTful Endpoints
 
+All REST API endpoints support dual-format responses via content negotiation:
+- **Default**: JSON format (`Content-Type: application/json`)
+- **Markdown**: Via `Accept: text/markdown` header (`Content-Type: text/markdown; charset=utf-8`)
+
 ```typescript
 // Memory CRUD operations
 POST   /api/memories          // Create memory
@@ -177,14 +181,28 @@ GET    /api/memories/:id      // Get memory by ID
 PUT    /api/memories/:id      // Update memory
 DELETE /api/memories/:id      // Delete memory
 GET    /api/memories          // List memories (paginated)
-
-// Search and discovery
+GET    /api/memories/stats    // Get memory statistics
 GET    /api/memories/search   // Search memories
-GET    /api/tags              // List all tags
-POST   /api/memories/:id/tags // Add tags to memory
 
-// URL content management
-POST   /api/memories/:id/refresh-url // Refresh URL content
+// Tag Hierarchy operations
+POST   /api/tags/create-with-parent        // Create parent-child relationship
+GET    /api/tags/tree                      // Get complete hierarchy tree
+GET    /api/tags/:id/ancestors             // Get all ancestor tags
+GET    /api/tags/:id/descendants           // Get all descendant tags
+GET    /api/tags/:id/parents               // Get immediate parent tags
+GET    /api/tags/:id/children              // Get immediate child tags
+POST   /api/tags/:id/parent                // Add parent relationship
+DELETE /api/tags/:id/parent/:parentId      // Remove parent relationship
+```
+
+**Content Negotiation Example:**
+```bash
+# JSON response (default)
+curl http://localhost:8787/api/memories
+
+# Markdown response
+curl http://localhost:8787/api/memories \
+  -H "Accept: text/markdown"
 ```
 
 ### MCP Tool Specifications
