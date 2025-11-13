@@ -16,13 +16,13 @@ CREATE INDEX idx_api_keys_active ON api_keys(is_active);
 CREATE INDEX idx_api_keys_entity ON api_keys(entity_name);
 CREATE INDEX idx_api_keys_expires ON api_keys(expires_at);
 
--- Example: Insert a test key (key: test_msk_abc123def456)
--- Hash generated with: echo -n "test_msk_abc123def456" | sha256sum
+-- Example: Insert a test key (key: test_msk_abc123def456789012345678)
+-- Hash generated with: echo -n "test_msk_abc123def456789012345678" | sha256sum
 INSERT INTO api_keys (id, key_hash, entity_name, created_at, notes)
 VALUES
   (
     lower(hex(randomblob(16))),
-    '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+    '718d995faa23863153775a4fc44094ea46e7e9e0a11008c3696074d58c158d67',
     'Test Key',
     strftime('%s','now'),
     'Development test key - revoke in production'
