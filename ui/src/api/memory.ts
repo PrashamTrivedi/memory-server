@@ -6,83 +6,47 @@ import {
   MemoryListResponse,
   SearchMemoryRequest,
   SearchMemoryResponse,
-  ApiResponse,
   MemoryStats
 } from '../types/memory'
-
-const API_BASE = '/api'
+import { api } from './client'
 
 class MemoryApiClient {
-  async getMemories(page: number =0 , limit: number = 20): Promise<MemoryListResponse> {
-    const response = await fetch(`${API_BASE}/memories?offset=${page * limit}&limit=${limit}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch memories: ${response.statusText}`)
+  async getMemories(page: number = 0, limit: number = 20): Promise<MemoryListResponse> {
+    const response = await api.get<MemoryListResponse>(`/memories?offset=${page * limit}&limit=${limit}`)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch memories')
     }
-    const data: ApiResponse<MemoryListResponse> = await response.json()
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to fetch memories')
-    }
-    return data.data
+    return response.data
   }
 
   async getMemory(id: string): Promise<Memory> {
-    const response = await fetch(`${API_BASE}/memories/${id}`)
-    if (!response.ok) {
-      throw new Error(`Failed to fetch memory: ${response.statusText}`)
+    const response = await api.get<Memory>(`/memories/${id}`)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch memory')
     }
-    const data: ApiResponse<Memory> = await response.json()
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to fetch memory')
-    }
-    return data.data
+    return response.data
   }
 
   async createMemory(memory: CreateMemoryRequest): Promise<Memory> {
-    const response = await fetch(`${API_BASE}/memories`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(memory),
-    })
-    if (!response.ok) {
-      throw new Error(`Failed to create memory: ${response.statusText}`)
+    const response = await api.post<Memory>('/memories', memory)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to create memory')
     }
-    const data: ApiResponse<Memory> = await response.json()
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to create memory')
-    }
-    return data.data
+    return response.data
   }
 
   async updateMemory(id: string, memory: UpdateMemoryRequest): Promise<Memory> {
-    const response = await fetch(`${API_BASE}/memories/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(memory),
-    })
-    if (!response.ok) {
-      throw new Error(`Failed to update memory: ${response.statusText}`)
+    const response = await api.put<Memory>(`/memories/${id}`, memory)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to update memory')
     }
-    const data: ApiResponse<Memory> = await response.json()
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to update memory')
-    }
-    return data.data
+    return response.data
   }
 
   async deleteMemory(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/memories/${id}`, {
-      method: 'DELETE',
-    })
-    if (!response.ok) {
-      throw new Error(`Failed to delete memory: ${response.statusText}`)
-    }
-    const data: ApiResponse<void> = await response.json()
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to delete memory')
+    const response = await api.delete<void>(`/memories/${id}`)
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete memory')
     }
   }
 
@@ -99,28 +63,24 @@ class MemoryApiClient {
       params.append('offset', request.offset.toString())
     }
 
-    const response = await fetch(`${API_BASE}/memories/search?${params}`)
-    if (!response.ok) {
-      throw new Error(`Failed to search memories: ${response.statusText}`)
+    const response = await api.get<SearchMemoryResponse>(`/memories/search?${params}`)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to search memories')
     }
-    const data: ApiResponse<SearchMemoryResponse> = await response.json()
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to search memories')
-    }
-    return data.data
+    return response.data
   }
 
   async getMemoryStats(): Promise<MemoryStats> {
-    const response = await fetch(`${API_BASE}/memories/stats`)
-    if (!response.ok) {
+    try {
+      const response = await api.get<MemoryStats>('/memories/stats')
+      if (!response.success || !response.data) {
+        return {total: 0, recent: 0, tagged: 0}
+      }
+      return response.data
+    } catch {
       // If stats endpoint doesn't exist, return default stats
       return {total: 0, recent: 0, tagged: 0}
     }
-    const data: ApiResponse<MemoryStats> = await response.json()
-    if (!data.success || !data.data) {
-      return {total: 0, recent: 0, tagged: 0}
-    }
-    return data.data
   }
 }
 
