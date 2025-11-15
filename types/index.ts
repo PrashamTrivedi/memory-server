@@ -126,3 +126,22 @@ export interface DescendantsResponse {
 export interface TagTreeResponse {
   tree: TagTreeNode[];
 }
+
+// Rate limiting interface
+export interface RateLimit {
+  limit(options: { key: string }): Promise<{
+    success: boolean;
+  }>;
+}
+
+// Cloudflare Workers environment bindings
+export interface Env {
+  DB: D1Database;
+  CACHE_KV: KVNamespace;
+  BROWSER: Fetcher;
+  ENVIRONMENT: string;
+
+  // Rate limiting bindings
+  API_RATE_LIMITER: RateLimit;
+  MCP_RATE_LIMITER: RateLimit;
+}

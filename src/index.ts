@@ -2,27 +2,88 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
+import * as apiKeyHandlers from './handlers/apiKeys';
 import { handleMCPHttpRequest } from './mcp/server';
+import { apiKeyAuth, getEntityName } from './middleware/apiKeyAuth';
+import { Env } from '../types';
 
-export interface Env {
-  DB: D1Database;
-  CACHE_KV: KVNamespace;
-  BROWSER: Fetcher;
-  ENVIRONMENT: string;
-}
-
+// Re-export Env for backward compatibility
+export type { Env };
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Enable CORS for React UI
-app.use('*', cors());
+// CORS configuration - restricted origins for security
+app.use('/*', cors({
+  origin: [
+    'https://memory-server-ui.dev-286.workers.dev',
+    'http://localhost:5173',
+    'http://localhost:8788',
+  ],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposeHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 600,
+  credentials: true,
+}));
 
-// Health check endpoint
-app.get('/', (c) => {
-  return c.json({ 
+// Apply authentication to API and MCP routes
+app.use('/api/*', apiKeyAuth);
+app.use('/mcp', apiKeyAuth);
+
+// Apply rate limiting to API routes
+app.use('/api/*', async (c, next) => {
+  const entityName = getEntityName(c);
+  const { success } = await c.env.API_RATE_LIMITER.limit({
+    key: entityName
+  });
+
+  if (!success) {
+    return c.json({
+      success: false,
+      error: 'Rate limit exceeded'
+    }, 429);
+  }
+
+  await next();
+});
+
+// Apply rate limiting to MCP routes
+app.use('/mcp', async (c, next) => {
+  const entityName = getEntityName(c);
+  const { success } = await c.env.MCP_RATE_LIMITER.limit({
+    key: entityName
+  });
+
+  if (!success) {
+    return c.json({
+      success: false,
+      error: 'Rate limit exceeded'
+    }, 429);
+  }
+
+  await next();
+});
+
+// Health check endpoint (no auth required)
+app.get('/health', (c) => {
+  return c.json({
     message: 'Memory Server API',
     version: '1.0.0',
     status: 'healthy'
+  });
+});
+
+// Root endpoint
+app.get('/', (c) => {
+  return c.json({
+    message: 'Memory Server API',
+    version: '1.0.0',
+    status: 'healthy',
+    endpoints: {
+      api: '/api/*',
+      mcp: '/mcp',
+      health: '/health'
+    }
   });
 });
 
@@ -44,6 +105,15 @@ app.get('/api/memories/search', memoryHandlers.findMemories);
 app.get('/api/memories/:id', memoryHandlers.getMemory);
 app.put('/api/memories/:id', memoryHandlers.updateMemory);
 app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
+
+// API Key Management endpoints
+// Note: These require authentication (same level as other API routes)
+// In production, you may want to add additional admin-only middleware
+app.post('/api/admin/keys', apiKeyHandlers.createApiKey);
+app.get('/api/admin/keys', apiKeyHandlers.listApiKeys);
+app.get('/api/admin/keys/:id', apiKeyHandlers.getApiKey);
+app.patch('/api/admin/keys/:id', apiKeyHandlers.updateApiKey);
+app.delete('/api/admin/keys/:id', apiKeyHandlers.revokeApiKey);
 
 // MCP endpoint
 app.all('/mcp', async (c) => {

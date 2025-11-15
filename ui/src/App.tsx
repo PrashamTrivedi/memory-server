@@ -1,16 +1,35 @@
-import { useState } from 'react';
-import { TagManagement, MemoryManagement } from './pages';
+import { useState, useEffect } from 'react';
+import { TagManagement, MemoryManagement, ApiKeys } from './pages';
 import { useTheme } from './contexts/ThemeContext';
 import { useMemoryStats } from './api/memory';
+import { api } from './api/client';
 import './App.css';
 import './components/TagHierarchy.css';
 
-type AppView = 'home' | 'tags' | 'memories';
+type AppView = 'home' | 'tags' | 'memories' | 'api-keys';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('memories'); // Default to memories view
   const { theme, toggleTheme } = useTheme();
   const { data: stats } = useMemoryStats();
+  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+
+  useEffect(() => {
+    // Check if API key is configured
+    const hasApiKey = !!api.getApiKey();
+    setShowApiKeyPrompt(!hasApiKey);
+  }, []);
+
+  const handleSaveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      api.setApiKey(apiKeyInput.trim());
+      setShowApiKeyPrompt(false);
+      setApiKeyInput('');
+      // Reload the page to refresh all data with the new key
+      window.location.reload();
+    }
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -18,6 +37,8 @@ function App() {
         return <TagManagement />;
       case 'memories':
         return <MemoryManagement />;
+      case 'api-keys':
+        return <ApiKeys />;
       default:
         return (
           <div className="home-view">
@@ -64,6 +85,79 @@ function App() {
 
   return (
     <div className="App">
+      {/* API Key Configuration Prompt */}
+      {showApiKeyPrompt && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: theme === 'light' ? 'white' : '#1e1e1e',
+            padding: '2rem',
+            borderRadius: '8px',
+            maxWidth: '500px',
+            width: '90%',
+          }}>
+            <h2 style={{ marginTop: 0 }}>Configure API Key</h2>
+            <p style={{ marginBottom: '1rem' }}>
+              To use the Memory Server UI, you need to configure an API key.
+              Enter your admin API key below:
+            </p>
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="msk_..."
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                marginBottom: '1rem',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontSize: '1rem',
+                fontFamily: 'monospace',
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveApiKey();
+                }
+              }}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleSaveApiKey}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Save API Key
+              </button>
+            </div>
+            <p style={{
+              marginTop: '1rem',
+              fontSize: '0.875rem',
+              color: theme === 'light' ? '#666' : '#999'
+            }}>
+              <strong>Note:</strong> For instructions on creating your first API key,
+              see the <code>docs/API_KEY_MANAGEMENT.md</code> file.
+            </p>
+          </div>
+        </div>
+      )}
+
       <header className="App-header">
         <div className="header-content">
           <div className="header-info">
@@ -110,7 +204,7 @@ function App() {
             </svg>
             Memories
           </button>
-          <button 
+          <button
             className={`nav-button ${currentView === 'tags' ? 'active' : ''}`}
             onClick={() => setCurrentView('tags')}
           >
@@ -119,6 +213,16 @@ function App() {
               <path d="M7 7H7.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Tags
+          </button>
+          <button
+            className={`nav-button ${currentView === 'api-keys' ? 'active' : ''}`}
+            onClick={() => setCurrentView('api-keys')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M15 7C15 8.10457 14.1046 9 13 9C11.8954 9 11 8.10457 11 7C11 5.89543 11.8954 5 13 5C14.1046 5 15 5.89543 15 7Z" stroke="currentColor" strokeWidth="2"/>
+              <path d="M13 9V19M13 19L10 16M13 19L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            API Keys
           </button>
         </nav>
       </header>
