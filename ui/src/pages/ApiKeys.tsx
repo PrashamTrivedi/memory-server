@@ -39,6 +39,13 @@ export function ApiKeys() {
   const loadKeys = async () => {
     try {
       setLoading(true);
+      // If no API key is configured, skip loading (user needs to create first key)
+      if (!api.getApiKey()) {
+        setKeys([]);
+        setError('No API key configured. Create your first API key to get started.');
+        setShowCreateForm(true);
+        return;
+      }
       const response = await api.get<{ keys: ApiKey[]; total: number }>('/api/admin/keys');
       setKeys(response.data?.keys || []);
       setError(null);
@@ -58,11 +65,28 @@ export function ApiKeys() {
     }
 
     try {
-      const response = await api.post<NewApiKey>('/api/admin/keys', {
+      const body = {
         entity_name: entityName,
         notes: notes || undefined,
         expires_in_days: expiresInDays || undefined
-      });
+      };
+
+      let response: { data?: NewApiKey };
+
+      // Try bootstrap first (works when no keys exist)
+      try {
+        response = await api.bootstrap<NewApiKey>(body);
+
+        // If bootstrap succeeds, this is the first key - save it to the client
+        if (response.data?.key) {
+          api.setApiKey(response.data.key);
+          console.log('Bootstrap successful: First API key created and saved');
+        }
+      } catch (bootstrapError) {
+        // Bootstrap failed - keys already exist, use regular authenticated endpoint
+        console.log('Bootstrap not available, using authenticated endpoint');
+        response = await api.post<NewApiKey>('/api/admin/keys', body);
+      }
 
       if (response.data) {
         setNewlyCreatedKey(response.data);
@@ -118,8 +142,18 @@ export function ApiKeys() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className={`mb-4 p-4 border rounded ${
+          error.includes('No API key configured')
+            ? 'bg-blue-100 border-blue-400 text-blue-700'
+            : 'bg-red-100 border-red-400 text-red-700'
+        }`}>
           {error}
+          {error.includes('No API key configured') && (
+            <p className="mt-2 text-sm">
+              <strong>Getting Started:</strong> Fill in the form below to create your first API key.
+              It will be automatically saved and used for all future operations.
+            </p>
+          )}
         </div>
       )}
 

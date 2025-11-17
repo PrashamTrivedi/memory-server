@@ -26,6 +26,10 @@ app.use('/*', cors({
   credentials: true,
 }));
 
+// Bootstrap endpoint for creating first API key (no auth required)
+// This MUST be registered BEFORE the auth middleware
+app.post('/api/admin/keys/bootstrap', apiKeyHandlers.bootstrapApiKey);
+
 // Apply authentication to API and MCP routes
 app.use('/api/*', apiKeyAuth);
 app.use('/mcp', apiKeyAuth);

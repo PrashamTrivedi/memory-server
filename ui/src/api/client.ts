@@ -144,6 +144,28 @@ class ApiClient {
 
     return response.json();
   }
+
+  /**
+   * Bootstrap: Create first API key without authentication
+   * Only works when no keys exist in the database
+   */
+  async bootstrap<T>(body: any): Promise<ApiResponse<T>> {
+    const response = await fetch(`${API_BASE}/admin/keys/bootstrap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Explicitly no Authorization header for bootstrap
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: response.statusText })) as { error?: string };
+      throw new Error(errorData.error || `Request failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 // Export a singleton instance

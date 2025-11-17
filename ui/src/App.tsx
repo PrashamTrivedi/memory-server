@@ -131,7 +131,23 @@ function App() {
                 }
               }}
             />
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between' }}>
+              <button
+                onClick={() => {
+                  setShowApiKeyPrompt(false);
+                  setCurrentView('api-keys');
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Create First API Key
+              </button>
               <button
                 onClick={handleSaveApiKey}
                 style={{
@@ -151,8 +167,9 @@ function App() {
               fontSize: '0.875rem',
               color: theme === 'light' ? '#666' : '#999'
             }}>
-              <strong>Note:</strong> For instructions on creating your first API key,
-              see the <code>docs/API_KEY_MANAGEMENT.md</code> file.
+              <strong>New user?</strong> Click "Create First API Key" to get started.
+              <br />
+              <strong>Already have a key?</strong> Enter it above and click "Save API Key".
             </p>
           </div>
         </div>

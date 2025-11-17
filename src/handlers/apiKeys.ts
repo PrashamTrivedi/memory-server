@@ -195,6 +195,86 @@ export async function revokeApiKey(c: Context<{ Bindings: Env }>) {
 }
 
 /**
+ * Bootstrap: Create first API key without authentication
+ * POST /api/admin/keys/bootstrap
+ * Only works when NO keys exist in the database
+ */
+export async function bootstrapApiKey(c: Context<{ Bindings: Env }>) {
+  try {
+    const db = c.env.DB;
+
+    // Check if any keys already exist
+    const existingKeys = await db
+      .prepare('SELECT COUNT(*) as count FROM api_keys')
+      .first<{ count: number }>();
+
+    if (existingKeys && existingKeys.count > 0) {
+      return c.json({
+        success: false,
+        error: 'Bootstrap not available. API keys already exist. Use the regular create endpoint with authentication.'
+      }, 403);
+    }
+
+    // Parse request body
+    const body = await c.req.json<CreateKeyRequest>();
+
+    if (!body.entity_name || body.entity_name.trim() === '') {
+      return c.json({
+        success: false,
+        error: 'entity_name is required'
+      }, 400);
+    }
+
+    // Generate secure API key (32 bytes = 64 hex chars + msk_ prefix)
+    const apiKey = 'msk_' + randomBytes(32).toString('hex');
+
+    // Hash the key for storage
+    const keyHash = createHash('sha256').update(apiKey).digest('hex');
+
+    // Generate UUID for id
+    const id = randomBytes(16).toString('hex');
+    const now = Math.floor(Date.now() / 1000);
+
+    // Calculate expiration if specified
+    let expiresAt: number | null = null;
+    if (body.expires_in_days && body.expires_in_days > 0) {
+      expiresAt = now + (body.expires_in_days * 24 * 60 * 60);
+    }
+
+    // Insert into database
+    await db
+      .prepare(`
+        INSERT INTO api_keys (id, key_hash, entity_name, created_at, expires_at, notes, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, 1)
+      `)
+      .bind(id, keyHash, body.entity_name.trim(), now, expiresAt, body.notes || null)
+      .run();
+
+    const response: ApiKeyResponse = {
+      id,
+      key: apiKey,  // IMPORTANT: Only shown once!
+      entity_name: body.entity_name.trim(),
+      created_at: now,
+      expires_at: expiresAt,
+      notes: body.notes || null
+    };
+
+    return c.json({
+      success: true,
+      data: response,
+      warning: 'Save this API key now. It will not be shown again! This is your bootstrap admin key.'
+    }, 201);
+  } catch (error) {
+    console.error('Bootstrap API key error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create bootstrap API key',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+}
+
+/**
  * Update API key details (entity_name, notes)
  * PATCH /api/admin/keys/:id
  */
