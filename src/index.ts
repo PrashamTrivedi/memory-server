@@ -30,6 +30,12 @@ app.use('/*', cors({
 }));
 
 // OAuth Discovery endpoints (no auth required)
+// Resource-specific discovery (Claude Desktop requests this path)
+app.get('/.well-known/oauth-protected-resource/mcp', (c) => {
+  const baseUrl = new URL(c.req.url).origin;
+  return c.json(getProtectedResourceMetadata(baseUrl));
+});
+
 app.get('/.well-known/oauth-protected-resource', (c) => {
   const baseUrl = new URL(c.req.url).origin;
   return c.json(getProtectedResourceMetadata(baseUrl));
