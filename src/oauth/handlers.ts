@@ -115,10 +115,23 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
 }
 
 export async function handleToken(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.parseBody();
-  const code = body['code'] as string;
-  const code_verifier = body['code_verifier'] as string;
-  const grant_type = body['grant_type'] as string;
+  // Support both form-urlencoded and JSON bodies
+  const contentType = c.req.header('Content-Type') || '';
+  let code: string;
+  let code_verifier: string;
+  let grant_type: string;
+
+  if (contentType.includes('application/json')) {
+    const json = await c.req.json();
+    code = json.code;
+    code_verifier = json.code_verifier;
+    grant_type = json.grant_type;
+  } else {
+    const body = await c.req.parseBody();
+    code = body['code'] as string;
+    code_verifier = body['code_verifier'] as string;
+    grant_type = body['grant_type'] as string;
+  }
 
   if (grant_type !== 'authorization_code') {
     return c.json({ error: 'unsupported_grant_type' }, 400);

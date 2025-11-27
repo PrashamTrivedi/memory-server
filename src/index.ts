@@ -21,6 +21,8 @@ app.use('/*', cors({
     'https://memory-server-ui.dev-286.workers.dev',
     'http://localhost:5173',
     'http://localhost:8788',
+    'https://claude.ai',
+    'https://claude.com',
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
