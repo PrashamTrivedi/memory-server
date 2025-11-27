@@ -1,0 +1,79 @@
+import { Context, Next } from 'hono';
+import { jwtVerify } from 'jose';
+import { apiKeyAuth } from './apiKeyAuth';
+import { Env } from '../../types';
+
+interface ApiKeyContext {
+  id: string;
+  entityName: string;
+}
+
+interface AuthContext {
+  type: 'oauth';
+  apiKeyId: string;
+  entityName: string;
+}
+
+type Variables = {
+  apiKey: ApiKeyContext;
+  auth: AuthContext;
+};
+
+export async function dualAuth(c: Context<{ Bindings: Env; Variables: Variables }>, next: Next) {
+  const authHeader = c.req.header('Authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return unauthorizedResponse(c);
+  }
+
+  const token = authHeader.substring(7);
+
+  if (token.startsWith('msk_')) {
+    return apiKeyAuth(c, next);
+  }
+
+  try {
+    const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+    const baseUrl = new URL(c.req.url).origin;
+
+    const { payload } = await jwtVerify(token, secret, {
+      issuer: baseUrl,
+      audience: baseUrl,
+    });
+
+    const apiKeyId = payload.sub || '';
+    const entityName = (payload.entity as string) || '';
+
+    c.set('auth', {
+      type: 'oauth',
+      apiKeyId,
+      entityName,
+    });
+
+    c.set('apiKey', {
+      id: apiKeyId,
+      entityName,
+    });
+
+    await next();
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    return unauthorizedResponse(c);
+  }
+}
+
+function unauthorizedResponse(c: Context<{ Bindings: Env; Variables: Variables }>) {
+  const baseUrl = new URL(c.req.url).origin;
+
+  return c.json(
+    {
+      success: false,
+      error: 'Unauthorized',
+      hint: 'Provide API key (Bearer msk_...) or OAuth token'
+    },
+    401,
+    {
+      'WWW-Authenticate': `Bearer resource="${baseUrl}/.well-known/oauth-protected-resource"`
+    }
+  );
+}

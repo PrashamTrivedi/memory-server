@@ -1,0 +1,37 @@
+export interface ProtectedResourceMetadata {
+  resource: string;
+  authorization_servers: string[];
+  bearer_methods_supported: string[];
+  scopes_supported: string[];
+}
+
+export interface AuthorizationServerMetadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+}
+
+export function getProtectedResourceMetadata(baseUrl: string): ProtectedResourceMetadata {
+  return {
+    resource: `${baseUrl}/mcp`,
+    authorization_servers: [baseUrl],
+    bearer_methods_supported: ['header'],
+    scopes_supported: ['mcp:full']
+  };
+}
+
+export function getAuthorizationServerMetadata(baseUrl: string): AuthorizationServerMetadata {
+  return {
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/oauth/authorize`,
+    token_endpoint: `${baseUrl}/oauth/token`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code'],
+    code_challenge_methods_supported: ['S256'],
+    token_endpoint_auth_methods_supported: ['none']
+  };
+}

@@ -144,4 +144,7 @@ export interface Env {
   // Rate limiting bindings
   API_RATE_LIMITER: RateLimit;
   MCP_RATE_LIMITER: RateLimit;
+
+  // OAuth JWT signing secret
+  JWT_SECRET: string;
 }

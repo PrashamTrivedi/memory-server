@@ -4,7 +4,10 @@ import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
 import * as apiKeyHandlers from './handlers/apiKeys';
 import { handleMCPHttpRequest } from './mcp/server';
-import { apiKeyAuth, getEntityName } from './middleware/apiKeyAuth';
+import { getEntityName } from './middleware/apiKeyAuth';
+import { dualAuth } from './middleware/dualAuth';
+import { getProtectedResourceMetadata, getAuthorizationServerMetadata } from './oauth/metadata';
+import { showAuthorizeForm, handleAuthorize, handleToken } from './oauth/handlers';
 import { Env } from '../types';
 
 // Re-export Env for backward compatibility
@@ -26,9 +29,25 @@ app.use('/*', cors({
   credentials: true,
 }));
 
-// Apply authentication to API and MCP routes
-app.use('/api/*', apiKeyAuth);
-app.use('/mcp', apiKeyAuth);
+// OAuth Discovery endpoints (no auth required)
+app.get('/.well-known/oauth-protected-resource', (c) => {
+  const baseUrl = new URL(c.req.url).origin;
+  return c.json(getProtectedResourceMetadata(baseUrl));
+});
+
+app.get('/.well-known/oauth-authorization-server', (c) => {
+  const baseUrl = new URL(c.req.url).origin;
+  return c.json(getAuthorizationServerMetadata(baseUrl));
+});
+
+// OAuth flow endpoints (no auth required)
+app.get('/oauth/authorize', showAuthorizeForm);
+app.post('/oauth/authorize', handleAuthorize);
+app.post('/oauth/token', handleToken);
+
+// Apply authentication to API and MCP routes (supports both API Key and JWT)
+app.use('/api/*', dualAuth);
+app.use('/mcp', dualAuth);
 
 // Apply rate limiting to API routes
 app.use('/api/*', async (c, next) => {
