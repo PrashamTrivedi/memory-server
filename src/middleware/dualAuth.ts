@@ -35,10 +35,11 @@ export async function dualAuth(c: Context<{ Bindings: Env; Variables: Variables 
   try {
     const secret = new TextEncoder().encode(c.env.JWT_SECRET);
     const baseUrl = new URL(c.req.url).origin;
+    const resourceUrl = `${baseUrl}/mcp`; // RFC 8707 resource URL
 
     const { payload } = await jwtVerify(token, secret, {
       issuer: baseUrl,
-      audience: baseUrl,
+      audience: [baseUrl, resourceUrl], // Accept both base URL and resource URL
     });
 
     const apiKeyId = payload.sub || '';

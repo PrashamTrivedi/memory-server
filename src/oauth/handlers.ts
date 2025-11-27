@@ -8,6 +8,7 @@ interface AuthCodeData {
   api_key_id: string;
   client_id: string;
   redirect_uri: string;
+  resource?: string; // RFC 8707 resource parameter
 }
 
 interface ApiKeyRecord {
@@ -50,13 +51,13 @@ function generateRandomHex(bytes: number): string {
 }
 
 export async function showAuthorizeForm(c: Context<{ Bindings: Env }>) {
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method } = c.req.query();
+  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, resource } = c.req.query();
 
   if (!redirect_uri || !code_challenge || code_challenge_method !== 'S256') {
     return c.html(errorPage('Invalid OAuth request. Missing required parameters or unsupported code_challenge_method (only S256 supported).'), 400);
   }
 
-  return c.html(apiKeyEntryForm({ client_id, redirect_uri, state, code_challenge }));
+  return c.html(apiKeyEntryForm({ client_id, redirect_uri, state, code_challenge, resource }));
 }
 
 export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
@@ -66,8 +67,12 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
   const redirect_uri = body['redirect_uri'] as string;
   const state = body['state'] as string;
   const code_challenge = body['code_challenge'] as string;
+  const resource = body['resource'] as string; // RFC 8707
+
+  console.log('Authorize POST - redirect_uri:', redirect_uri, 'resource:', resource, 'code_challenge:', code_challenge?.substring(0, 20) + '...');
 
   if (!api_key || !redirect_uri || !code_challenge) {
+    console.log('Authorize error: missing fields - api_key:', !!api_key, 'redirect_uri:', !!redirect_uri, 'code_challenge:', !!code_challenge);
     return c.html(errorPage('Missing required fields.'), 400);
   }
 
@@ -78,6 +83,7 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
     .first() as ApiKeyRecord | null;
 
   if (!apiKeyRecord) {
+    console.log('Authorize: Invalid API key');
     return c.html(apiKeyEntryForm({
       client_id, redirect_uri, state, code_challenge,
       error: 'Invalid API key. Please check and try again.'
@@ -86,12 +92,14 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
 
   const now = Math.floor(Date.now() / 1000);
   if (apiKeyRecord.expires_at && apiKeyRecord.expires_at < now) {
+    console.log('Authorize: API key expired');
     return c.html(apiKeyEntryForm({
       client_id, redirect_uri, state, code_challenge,
       error: 'API key has expired.'
     }));
   }
 
+  console.log('Authorize: API key valid for entity:', apiKeyRecord.entity_name);
   const authCode = generateRandomHex(32);
 
   const authCodeData: AuthCodeData = {
@@ -99,6 +107,7 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
     api_key_id: apiKeyRecord.id,
     client_id: client_id || 'default',
     redirect_uri,
+    resource: resource || undefined, // RFC 8707
   };
 
   await c.env.CACHE_KV.put(
@@ -111,6 +120,7 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
   redirectUrl.searchParams.set('code', authCode);
   if (state) redirectUrl.searchParams.set('state', state);
 
+  console.log('Authorize: SUCCESS - redirecting to:', redirectUrl.toString().substring(0, 80) + '...');
   return c.redirect(redirectUrl.toString());
 }
 
@@ -181,6 +191,10 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
   const secret = new TextEncoder().encode(c.env.JWT_SECRET);
   const baseUrl = new URL(c.req.url).origin;
 
+  // RFC 8707: Use resource as audience if provided, otherwise fallback to baseUrl
+  const audience = authCodeData.resource || baseUrl;
+  console.log('Token: issuing JWT with audience:', audience);
+
   const accessToken = await new SignJWT({
     sub: apiKey.id,
     entity: apiKey.entity_name,
@@ -188,7 +202,7 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(baseUrl)
-    .setAudience(baseUrl)
+    .setAudience(audience)
     .setIssuedAt()
     .setExpirationTime('1h')
     .sign(secret);

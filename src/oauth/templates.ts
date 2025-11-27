@@ -3,6 +3,7 @@ interface FormParams {
   redirect_uri?: string;
   state?: string;
   code_challenge?: string;
+  resource?: string; // RFC 8707 resource parameter
   error?: string;
 }
 
@@ -16,7 +17,7 @@ function escapeHtml(str: string): string {
 }
 
 export function apiKeyEntryForm(params: FormParams): string {
-  const { client_id, redirect_uri, state, code_challenge, error } = params;
+  const { client_id, redirect_uri, state, code_challenge, resource, error } = params;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -136,6 +137,7 @@ export function apiKeyEntryForm(params: FormParams): string {
       <input type="hidden" name="redirect_uri" value="${escapeHtml(redirect_uri || '')}">
       <input type="hidden" name="state" value="${escapeHtml(state || '')}">
       <input type="hidden" name="code_challenge" value="${escapeHtml(code_challenge || '')}">
+      <input type="hidden" name="resource" value="${escapeHtml(resource || '')}">
 
       <label for="api_key">API Key</label>
       <input
