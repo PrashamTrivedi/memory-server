@@ -1,18 +1,36 @@
 .memory-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-md);
-  padding: var(--spacing-lg);
-  transition: all 0.2s ease;
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xl);
+  transition: all var(--transition-slow);
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.memory-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.memory-card:hover::before {
+  opacity: 1;
 }
 
 .memory-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
   border-color: var(--color-primary);
-  background: var(--color-surface-hover);
+  background: var(--color-surface-elevated);
 }
 
 .memory-card-header {
@@ -24,12 +42,18 @@
 
 .memory-card-title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--color-text-primary);
   flex: 1;
   margin-right: var(--spacing-md);
   line-height: 1.3;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline;
 }
 
 .memory-card-actions {
@@ -44,32 +68,41 @@
 }
 
 .memory-card-action-btn {
-  background: transparent;
+  background: var(--color-background-secondary);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
-  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
   color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
 }
 
 .memory-card-action-btn:hover {
   background: var(--color-surface-hover);
   border-color: var(--color-text-secondary);
   color: var(--color-text-secondary);
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: var(--shadow-md);
+}
+
+.memory-card-action-btn:active {
+  transform: scale(0.95) rotate(0deg);
 }
 
 .edit-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .delete-btn:hover {
   border-color: var(--color-error);
   color: var(--color-error);
+  background: var(--color-error-light);
 }
 
 .memory-card-content {
@@ -90,18 +123,24 @@
 .memory-url-link {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
   color: var(--color-primary);
   text-decoration: none;
-  font-size: 13px;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  transition: all 0.2s ease;
+  font-size: 0.8125rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  transition: all var(--transition-base);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  border-opacity: 0.2;
+  font-weight: 500;
 }
 
 .memory-url-link:hover {
-  background: var(--color-primary-light);
-  color: var(--color-primary-hover);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .memory-card-tags {
@@ -112,34 +151,64 @@
 }
 
 .memory-tag {
-  background: var(--color-primary-light);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-accent-light) 100%);
   color: var(--color-primary);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  font-size: 12px;
-  font-weight: 500;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--color-primary);
+  transition: all var(--transition-fast);
+  letter-spacing: 0.01em;
+  position: relative;
+  overflow: hidden;
+}
+
+.memory-tag::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.4s;
+}
+
+.memory-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--color-accent);
+}
+
+.memory-tag:hover::before {
+  left: 100%;
 }
 
 .memory-tag-more {
-  background: var(--color-border);
+  background: var(--color-background-secondary);
   color: var(--color-text-muted);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  font-size: 12px;
-  font-weight: 500;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
 }
 
 .memory-card-footer {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--color-border-light);
+  padding-top: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
 }
 
 .memory-card-date {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 /* Mobile responsiveness */
