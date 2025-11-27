@@ -175,3 +175,41 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
     scope: 'mcp:full'
   });
 }
+
+// Dynamic Client Registration (RFC 7591)
+// Claude Desktop requires this to register itself as an OAuth client
+export async function handleClientRegistration(c: Context<{ Bindings: Env }>) {
+  const body = await c.req.json();
+
+  // Generate a client_id for this registration
+  const clientId = `client_${generateRandomHex(16)}`;
+
+  // Store client registration in KV (optional, we accept any client)
+  // For simplicity, we don't require client_secret for public clients
+  const clientData = {
+    client_id: clientId,
+    client_name: body.client_name || 'MCP Client',
+    redirect_uris: body.redirect_uris || [],
+    grant_types: body.grant_types || ['authorization_code'],
+    response_types: body.response_types || ['code'],
+    token_endpoint_auth_method: body.token_endpoint_auth_method || 'none',
+    created_at: Date.now()
+  };
+
+  // Store in KV with 30-day expiry
+  await c.env.CACHE_KV.put(
+    `oauth_client:${clientId}`,
+    JSON.stringify(clientData),
+    { expirationTtl: 30 * 24 * 60 * 60 }
+  );
+
+  // Return the registration response per RFC 7591
+  return c.json({
+    client_id: clientId,
+    client_name: clientData.client_name,
+    redirect_uris: clientData.redirect_uris,
+    grant_types: clientData.grant_types,
+    response_types: clientData.response_types,
+    token_endpoint_auth_method: clientData.token_endpoint_auth_method
+  }, 201);
+}

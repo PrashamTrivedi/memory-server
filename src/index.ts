@@ -7,7 +7,7 @@ import { handleMCPHttpRequest } from './mcp/server';
 import { getEntityName } from './middleware/apiKeyAuth';
 import { dualAuth } from './middleware/dualAuth';
 import { getProtectedResourceMetadata, getAuthorizationServerMetadata } from './oauth/metadata';
-import { showAuthorizeForm, handleAuthorize, handleToken } from './oauth/handlers';
+import { showAuthorizeForm, handleAuthorize, handleToken, handleClientRegistration } from './oauth/handlers';
 import { Env } from '../types';
 
 // Re-export Env for backward compatibility
@@ -50,6 +50,7 @@ app.get('/.well-known/oauth-authorization-server', (c) => {
 app.get('/oauth/authorize', showAuthorizeForm);
 app.post('/oauth/authorize', handleAuthorize);
 app.post('/oauth/token', handleToken);
+app.post('/oauth/register', handleClientRegistration);
 
 // Apply authentication to API and MCP routes (supports both API Key and JWT)
 app.use('/api/*', dualAuth);
