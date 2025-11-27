@@ -5,68 +5,119 @@
 .tag-input-container {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
   align-items: center;
-  min-height: 40px;
-  padding: var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-sm);
+  min-height: 48px;
+  padding: var(--spacing-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
   background: var(--color-surface);
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
 }
 
 .tag-input-container:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
+  box-shadow: 0 0 0 4px var(--color-primary-light), var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .tag-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
-  font-size: 13px;
-  border-radius: var(--border-radius-xs);
+  font-size: 0.875rem;
+  border-radius: var(--border-radius-md);
   white-space: nowrap;
-  max-width: 250px;
+  max-width: 280px;
   overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.tag-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .tag-chip.simple {
-  background: var(--color-primary-light);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-accent-light) 100%);
   color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 2px solid var(--color-primary);
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.tag-chip.simple::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.tag-chip.simple:hover::before {
+  left: 100%;
 }
 
 .tag-chip.hierarchical {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  padding: 2px 4px;
-  border-radius: var(--border-radius-sm);
+  border: 2px solid var(--color-border);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .tag-parent {
-  background: var(--color-primary-light);
+  background: linear-gradient(135deg, var(--color-primary-light) 0%, var(--color-primary) 10%);
+  color: var(--color-primary-dark);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-primary);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+  position: relative;
+}
+
+[data-theme="dark"] .tag-parent {
   color: var(--color-primary);
-  padding: 2px 6px;
-  border-radius: var(--border-radius-xs);
-  font-weight: 500;
-  font-family: var(--font-mono, monospace);
+  box-shadow: 0 2px 4px rgba(96, 165, 250, 0.2);
 }
 
 .tag-separator {
-  color: var(--color-text-muted);
-  font-weight: bold;
-  margin: 0 2px;
+  color: var(--color-primary);
+  font-weight: 900;
+  margin: 0 var(--spacing-xs);
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: opacity var(--transition-base);
+}
+
+.tag-chip:hover .tag-separator {
+  opacity: 1;
 }
 
 .tag-child {
-  background: var(--color-secondary-light);
-  color: var(--color-secondary);
-  padding: 2px 6px;
-  border-radius: var(--border-radius-xs);
-  font-weight: 500;
-  font-family: var(--font-mono, monospace);
+  background: linear-gradient(135deg, var(--color-accent-light) 0%, var(--color-accent) 10%);
+  color: var(--color-accent-hover);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-accent);
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.15);
+  position: relative;
+}
+
+[data-theme="dark"] .tag-child {
+  color: var(--color-accent);
+  box-shadow: 0 2px 4px rgba(167, 139, 250, 0.2);
 }
 
 .tag-remove {
@@ -113,12 +164,13 @@
 }
 
 .tag-input-help {
-  margin-top: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--border-radius-sm);
-  font-size: 13px;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-info-light) 0%, var(--color-primary-light) 100%);
+  border: 2px solid var(--color-info);
+  border-radius: var(--border-radius-lg);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .help-text {

@@ -2,7 +2,6 @@ import {
   Tag,
   TagTreeNode,
   AddParentRequest,
-  TagHierarchyResponse,
   AncestorsResponse,
   DescendantsResponse,
   TagTreeResponse,
@@ -11,8 +10,7 @@ import {
   CreateTagsWithParentRequest,
   CreateTagsWithParentResponse
 } from '../types/tags';
-
-const API_BASE = '/api/tags';
+import { api } from './client';
 
 class TagHierarchyApiError extends Error {
   constructor(message: string, public statusCode?: number) {
@@ -30,30 +28,15 @@ export class TagHierarchyApi {
    */
   static async addParent(childTagId: number, parentTagId: number): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE}/${childTagId}/parent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          parent_tag_id: parentTagId,
-        } as AddParentRequest),
-      });
+      const response = await api.post(`/tags/${childTagId}/parent`, {
+        parent_tag_id: parentTagId,
+      } as AddParentRequest);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to add parent: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success) {
+        throw new TagHierarchyApiError(response.error || 'Failed to add parent');
       }
 
-      const data: TagHierarchyResponse = await response.json();
-      if (!data.success) {
-        throw new TagHierarchyApiError(data.error || 'Unknown error occurred');
-      }
-
-      return data.data;
+      return response.data;
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -69,21 +52,10 @@ export class TagHierarchyApi {
    */
   static async removeParent(childTagId: number, parentTagId: number): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/${childTagId}/parent/${parentTagId}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/tags/${childTagId}/parent/${parentTagId}`);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to remove parent: ${response.statusText}`,
-          response.status
-        );
-      }
-
-      const data: TagHierarchyResponse = await response.json();
-      if (!data.success) {
-        throw new TagHierarchyApiError(data.error || 'Unknown error occurred');
+      if (!response.success) {
+        throw new TagHierarchyApiError(response.error || 'Failed to remove parent');
       }
 
       return true;
@@ -102,18 +74,13 @@ export class TagHierarchyApi {
    */
   static async getAncestors(tagId: number): Promise<Tag[]> {
     try {
-      const response = await fetch(`${API_BASE}/${tagId}/ancestors`);
+      const response = await api.get<AncestorsResponse>(`/tags/${tagId}/ancestors`);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to fetch ancestors: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to fetch ancestors');
       }
 
-      const data: AncestorsResponse = await response.json();
-      return data.ancestors || [];
+      return (response.data as any).ancestors || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -129,18 +96,13 @@ export class TagHierarchyApi {
    */
   static async getDescendants(tagId: number): Promise<Tag[]> {
     try {
-      const response = await fetch(`${API_BASE}/${tagId}/descendants`);
+      const response = await api.get<DescendantsResponse>(`/tags/${tagId}/descendants`);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to fetch descendants: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to fetch descendants');
       }
 
-      const data: DescendantsResponse = await response.json();
-      return data.descendants || [];
+      return (response.data as any).descendants || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -156,22 +118,13 @@ export class TagHierarchyApi {
    */
   static async getParents(tagId: number): Promise<Tag[]> {
     try {
-      const response = await fetch(`${API_BASE}/${tagId}/parents`);
+      const response = await api.get<ParentsResponse>(`/tags/${tagId}/parents`);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to fetch parents: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to fetch parents');
       }
 
-      const data: ParentsResponse = await response.json();
-      if (!data.success || !data.data) {
-        throw new TagHierarchyApiError(data.error || 'Failed to fetch parents');
-      }
-
-      return data.data.parents || [];
+      return (response.data as any).parents || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -187,22 +140,13 @@ export class TagHierarchyApi {
    */
   static async getChildren(tagId: number): Promise<Tag[]> {
     try {
-      const response = await fetch(`${API_BASE}/${tagId}/children`);
+      const response = await api.get<ChildrenResponse>(`/tags/${tagId}/children`);
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to fetch children: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to fetch children');
       }
 
-      const data: ChildrenResponse = await response.json();
-      if (!data.success || !data.data) {
-        throw new TagHierarchyApiError(data.error || 'Failed to fetch children');
-      }
-
-      return data.data.children || [];
+      return (response.data as any).children || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -218,18 +162,13 @@ export class TagHierarchyApi {
    */
   static async getTagTree(): Promise<TagTreeNode[]> {
     try {
-      const response = await fetch(`${API_BASE}/tree`);
+      const response = await api.get<TagTreeResponse>('/tags/tree');
 
-      if (!response.ok) {
-        const errorData = await response.json() as TagHierarchyResponse;
-        throw new TagHierarchyApiError(
-          errorData.error || `Failed to fetch tag tree: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to fetch tag tree');
       }
 
-      const data: TagTreeResponse = await response.json();
-      return data.tree || [];
+      return (response.data as any).tree || [];
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
@@ -244,35 +183,20 @@ export class TagHierarchyApi {
    * Create tags with parent-child relationship
    */
   static async createTagsWithParent(
-    childName: string, 
+    childName: string,
     parentName: string
   ): Promise<CreateTagsWithParentResponse> {
     try {
-      const response = await fetch(`${API_BASE}/create-with-parent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          child_tag_name: childName,
-          parent_tag_name: parentName,
-        } as CreateTagsWithParentRequest),
-      });
+      const response = await api.post<CreateTagsWithParentResponse>('/tags/create-with-parent', {
+        child_tag_name: childName,
+        parent_tag_name: parentName,
+      } as CreateTagsWithParentRequest);
 
-      const data: CreateTagsWithParentResponse = await response.json();
-
-      if (!response.ok) {
-        throw new TagHierarchyApiError(
-          data.error || `Failed to create tags with parent: ${response.statusText}`,
-          response.status
-        );
+      if (!response.success || !response.data) {
+        throw new TagHierarchyApiError(response.error || 'Failed to create tags with parent');
       }
 
-      if (!data.success) {
-        throw new TagHierarchyApiError(data.error || 'Unknown error occurred');
-      }
-
-      return data;
+      return response.data;
     } catch (error) {
       if (error instanceof TagHierarchyApiError) {
         throw error;
