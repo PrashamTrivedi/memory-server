@@ -121,37 +121,47 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
   let code_verifier: string;
   let grant_type: string;
 
+  console.log('Token request - Content-Type:', contentType);
+
   if (contentType.includes('application/json')) {
     const json = await c.req.json();
     code = json.code;
     code_verifier = json.code_verifier;
     grant_type = json.grant_type;
+    console.log('Token request (JSON) - grant_type:', grant_type, 'code:', code?.substring(0, 10) + '...');
   } else {
     const body = await c.req.parseBody();
     code = body['code'] as string;
     code_verifier = body['code_verifier'] as string;
     grant_type = body['grant_type'] as string;
+    console.log('Token request (form) - grant_type:', grant_type, 'code:', code?.substring(0, 10) + '...');
   }
 
   if (grant_type !== 'authorization_code') {
+    console.log('Token error: unsupported_grant_type', grant_type);
     return c.json({ error: 'unsupported_grant_type' }, 400);
   }
 
   if (!code || !code_verifier) {
+    console.log('Token error: missing code or code_verifier');
     return c.json({ error: 'invalid_request', error_description: 'Missing code or code_verifier' }, 400);
   }
 
   const authCodeDataStr = await c.env.CACHE_KV.get(`oauth_code:${code}`);
 
   if (!authCodeDataStr) {
+    console.log('Token error: code not found in KV');
     return c.json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' }, 400);
   }
 
   const authCodeData: AuthCodeData = JSON.parse(authCodeDataStr);
+  console.log('Token: found auth code data for api_key_id:', authCodeData.api_key_id);
 
   const computedChallenge = await sha256Base64Url(code_verifier);
+  console.log('Token PKCE - computed:', computedChallenge.substring(0, 20) + '...', 'expected:', authCodeData.code_challenge.substring(0, 20) + '...');
 
   if (computedChallenge !== authCodeData.code_challenge) {
+    console.log('Token error: PKCE verification failed');
     return c.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, 400);
   }
 
@@ -163,8 +173,10 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
     .first() as ApiKeyRecord | null;
 
   if (!apiKey) {
+    console.log('Token error: API key not found in DB');
     return c.json({ error: 'invalid_grant', error_description: 'API key no longer exists' }, 400);
   }
+  console.log('Token: API key found, entity:', apiKey.entity_name);
 
   const secret = new TextEncoder().encode(c.env.JWT_SECRET);
   const baseUrl = new URL(c.req.url).origin;
@@ -181,6 +193,7 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
     .setExpirationTime('1h')
     .sign(secret);
 
+  console.log('Token: SUCCESS - issued JWT for entity:', apiKey.entity_name);
   return c.json({
     access_token: accessToken,
     token_type: 'Bearer',
