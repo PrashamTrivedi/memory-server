@@ -84,7 +84,7 @@ The API Keys page shows all keys with:
 - Entity Name
 - Status (Active/Revoked)
 - Created Date
-- Last Used Date
+- Last Used Date (updated for both direct API key and OAuth/MCP usage)
 - Expiration Date
 - Notes
 
@@ -318,6 +318,96 @@ If you were using CLI-generated keys before:
 2. **Create admin key** - Generate one admin key for UI access
 3. **Gradually migrate** - Create new keys through UI
 4. **Revoke old keys** - Once clients are updated, revoke old keys
+
+## OAuth Token Management
+
+### Token Flow and Lifetimes
+
+When using MCP clients with OAuth authentication, the server implements a secure token flow with automatic refresh capabilities:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Token Flow                                │
+├─────────────────────────────────────────────────────────────┤
+│  1. User enters API key → Authorization code issued          │
+│  2. Code exchanged → Access token (24h) + Refresh token (30d)│
+│  3. Access token expires → Client uses refresh token         │
+│  4. Refresh token used → New access + NEW refresh (rotation) │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Token Lifetimes:**
+
+| Token Type | Lifetime | Storage | Notes |
+|------------|----------|---------|-------|
+| Access Token | 24 hours | JWT (stateless) | Used for API authentication |
+| Refresh Token | 30 days | KV (stateful) | Single-use with automatic rotation |
+
+### Refresh Token Usage
+
+The OAuth token endpoint supports the `refresh_token` grant type for obtaining new access tokens without re-authentication:
+
+```bash
+# Request new access token using refresh token
+curl -X POST https://memory-server.dev/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "refresh_token",
+    "refresh_token": "your_refresh_token_here"
+  }'
+```
+
+**Response:**
+```json
+{
+  "access_token": "new_jwt_token...",
+  "token_type": "Bearer",
+  "expires_in": 86400,
+  "refresh_token": "new_refresh_token...",
+  "scope": "mcp:full"
+}
+```
+
+**Security Features:**
+- Refresh tokens are single-use only (automatic rotation)
+- Old refresh tokens are immediately invalidated after use
+- Each refresh returns both a new access token AND a new refresh token
+- Attempting to reuse an old refresh token will fail with `invalid_grant` error
+
+### Last Used Tracking
+
+API keys now properly track usage across all authentication methods:
+- Direct API key authentication (Bearer msk_...)
+- OAuth/JWT token authentication (Bearer jwt_...)
+- MCP client requests using OAuth tokens
+
+The `last_used_at` field is automatically updated whenever the key is used, regardless of authentication method. This allows you to monitor key activity and identify unused keys.
+
+## Email Notifications
+
+### Key Creation Notifications
+
+When the server is configured with email notification settings, a notification email is automatically sent to the server owner whenever a new API key is created. This provides a backup record of API keys for recovery purposes.
+
+**Required Environment Variables:**
+- `EMAIL_API_KEY`: API key for the email service (prashamhtrivedi.in email sender)
+- `NOTIFICATION_EMAIL`: Email address to receive key creation notifications
+
+**Email Contents:**
+The notification email includes:
+- Entity name of the created key
+- The full API key (for recovery)
+- Timestamp of creation
+- Security warning to save the key securely
+
+**Example Configuration:**
+```bash
+# In wrangler.toml or environment settings
+EMAIL_API_KEY = "your_email_api_key_here"
+NOTIFICATION_EMAIL = "admin@yourdomain.com"
+```
+
+**Note:** This is a fire-and-forget operation. If email sending fails, the key creation will still succeed, and the failure will be logged.
 
 ## Future Enhancements
 
