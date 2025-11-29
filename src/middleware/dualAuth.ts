@@ -56,6 +56,13 @@ export async function dualAuth(c: Context<{ Bindings: Env; Variables: Variables 
       entityName,
     });
 
+    // Update last_used_at for OAuth/JWT authentication (fire-and-forget)
+    const now = Math.floor(Date.now() / 1000);
+    c.env.DB.prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?')
+      .bind(now, apiKeyId)
+      .run()
+      .catch((err: unknown) => console.error('Failed to update last_used_at:', err));
+
     await next();
   } catch (error) {
     console.error('JWT verification failed:', error);

@@ -147,4 +147,8 @@ export interface Env {
 
   // OAuth JWT signing secret
   JWT_SECRET: string;
+
+  // Email notification settings (optional)
+  EMAIL_API_KEY?: string;
+  NOTIFICATION_EMAIL?: string;
 }

@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { createHash, randomBytes } from 'node:crypto';
 import { Env } from '../../types';
+import { sendKeyCreatedEmail } from '../utils/email';
 
 interface CreateKeyRequest {
   entity_name: string;
@@ -76,6 +77,15 @@ export async function createApiKey(c: Context<{ Bindings: Env }>) {
       expires_at: expiresAt,
       notes: body.notes || null
     };
+
+    // Send email notification if configured (fire-and-forget)
+    if (c.env.NOTIFICATION_EMAIL && c.env.EMAIL_API_KEY) {
+      sendKeyCreatedEmail(c.env, {
+        to: c.env.NOTIFICATION_EMAIL,
+        entityName: body.entity_name.trim(),
+        apiKey: apiKey,
+      }).catch((err) => console.error('Email notification failed:', err));
+    }
 
     return c.json({
       success: true,

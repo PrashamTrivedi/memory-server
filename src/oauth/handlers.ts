@@ -124,12 +124,21 @@ export async function handleAuthorize(c: Context<{ Bindings: Env }>) {
   return c.redirect(redirectUrl.toString());
 }
 
+interface RefreshTokenData {
+  api_key_id: string;
+  entity_name: string;
+  audience: string;
+  family_id: string;
+  created_at: number;
+}
+
 export async function handleToken(c: Context<{ Bindings: Env }>) {
   // Support both form-urlencoded and JSON bodies
   const contentType = c.req.header('Content-Type') || '';
   let code: string;
   let code_verifier: string;
   let grant_type: string;
+  let refresh_token: string;
 
   console.log('Token request - Content-Type:', contentType);
 
@@ -138,13 +147,20 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
     code = json.code;
     code_verifier = json.code_verifier;
     grant_type = json.grant_type;
-    console.log('Token request (JSON) - grant_type:', grant_type, 'code:', code?.substring(0, 10) + '...');
+    refresh_token = json.refresh_token;
+    console.log('Token request (JSON) - grant_type:', grant_type);
   } else {
     const body = await c.req.parseBody();
     code = body['code'] as string;
     code_verifier = body['code_verifier'] as string;
     grant_type = body['grant_type'] as string;
-    console.log('Token request (form) - grant_type:', grant_type, 'code:', code?.substring(0, 10) + '...');
+    refresh_token = body['refresh_token'] as string;
+    console.log('Token request (form) - grant_type:', grant_type);
+  }
+
+  // Handle refresh_token grant type
+  if (grant_type === 'refresh_token') {
+    return handleRefreshTokenGrant(c, refresh_token);
   }
 
   if (grant_type !== 'authorization_code') {
@@ -204,14 +220,117 @@ export async function handleToken(c: Context<{ Bindings: Env }>) {
     .setIssuer(baseUrl)
     .setAudience(audience)
     .setIssuedAt()
-    .setExpirationTime('1h')
+    .setExpirationTime('24h')
     .sign(secret);
 
-  console.log('Token: SUCCESS - issued JWT for entity:', apiKey.entity_name);
+  // Generate refresh token (30-day expiry, single-use with rotation)
+  const refreshToken = generateRandomHex(64);
+  const familyId = generateRandomHex(16); // For rotation tracking
+  const refreshTokenData = {
+    api_key_id: apiKey.id,
+    entity_name: apiKey.entity_name,
+    audience,
+    family_id: familyId,
+    created_at: Date.now(),
+  };
+
+  // Store in KV with 30-day expiry
+  await c.env.CACHE_KV.put(
+    `refresh_token:${refreshToken}`,
+    JSON.stringify(refreshTokenData),
+    { expirationTtl: 30 * 24 * 60 * 60 }
+  );
+
+  console.log('Token: SUCCESS - issued JWT and refresh token for entity:', apiKey.entity_name);
   return c.json({
     access_token: accessToken,
     token_type: 'Bearer',
-    expires_in: 3600,
+    expires_in: 86400,
+    refresh_token: refreshToken,
+    scope: 'mcp:full'
+  });
+}
+
+// Handle refresh_token grant type with token rotation
+async function handleRefreshTokenGrant(c: Context<{ Bindings: Env }>, refreshToken: string) {
+  if (!refreshToken) {
+    console.log('Refresh token error: missing refresh_token');
+    return c.json({ error: 'invalid_request', error_description: 'Missing refresh_token' }, 400);
+  }
+
+  // Retrieve refresh token data from KV
+  const tokenDataStr = await c.env.CACHE_KV.get(`refresh_token:${refreshToken}`);
+
+  if (!tokenDataStr) {
+    console.log('Refresh token error: token not found or expired');
+    return c.json({ error: 'invalid_grant', error_description: 'Invalid or expired refresh token' }, 400);
+  }
+
+  const tokenData: RefreshTokenData = JSON.parse(tokenDataStr);
+  console.log('Refresh token: found token for api_key_id:', tokenData.api_key_id);
+
+  // Immediately invalidate the old refresh token (single-use / rotation)
+  await c.env.CACHE_KV.delete(`refresh_token:${refreshToken}`);
+  console.log('Refresh token: invalidated old token');
+
+  // Verify the API key still exists and is active
+  const apiKey = await c.env.DB
+    .prepare('SELECT * FROM api_keys WHERE id = ? AND is_active = 1')
+    .bind(tokenData.api_key_id)
+    .first() as ApiKeyRecord | null;
+
+  if (!apiKey) {
+    console.log('Refresh token error: API key no longer exists or inactive');
+    // Invalidate entire token family for security
+    return c.json({ error: 'invalid_grant', error_description: 'API key no longer valid' }, 400);
+  }
+
+  // Check API key expiration
+  const now = Math.floor(Date.now() / 1000);
+  if (apiKey.expires_at && apiKey.expires_at < now) {
+    console.log('Refresh token error: API key expired');
+    return c.json({ error: 'invalid_grant', error_description: 'API key has expired' }, 400);
+  }
+
+  // Generate new access token
+  const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+  const baseUrl = new URL(c.req.url).origin;
+
+  const accessToken = await new SignJWT({
+    sub: apiKey.id,
+    entity: apiKey.entity_name,
+    scope: 'mcp:full'
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(baseUrl)
+    .setAudience(tokenData.audience)
+    .setIssuedAt()
+    .setExpirationTime('24h')
+    .sign(secret);
+
+  // Generate new refresh token (rotation)
+  const newRefreshToken = generateRandomHex(64);
+  const newTokenData: RefreshTokenData = {
+    api_key_id: apiKey.id,
+    entity_name: apiKey.entity_name,
+    audience: tokenData.audience,
+    family_id: tokenData.family_id, // Keep same family for tracking
+    created_at: Date.now(),
+  };
+
+  // Store new refresh token with 30-day expiry
+  await c.env.CACHE_KV.put(
+    `refresh_token:${newRefreshToken}`,
+    JSON.stringify(newTokenData),
+    { expirationTtl: 30 * 24 * 60 * 60 }
+  );
+
+  console.log('Refresh token: SUCCESS - issued new tokens for entity:', apiKey.entity_name);
+  return c.json({
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: 86400,
+    refresh_token: newRefreshToken,
     scope: 'mcp:full'
   });
 }
