@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
 import * as apiKeyHandlers from './handlers/apiKeys';
+import * as skillHandlers from './handlers/skills';
 import { handleMCPHttpRequest } from './mcp/server';
 import { getEntityName } from './middleware/apiKeyAuth';
 import { dualAuth } from './middleware/dualAuth';
@@ -53,6 +54,9 @@ app.get('/oauth/authorize', showAuthorizeForm);
 app.post('/oauth/authorize', handleAuthorize);
 app.post('/oauth/token', handleToken);
 app.post('/oauth/register', handleClientRegistration);
+
+// Skill download endpoint (no auth required - token is the auth)
+app.get('/skills/download/:token', skillHandlers.downloadSkillPackage);
 
 // Apply authentication to API and MCP routes (supports both API Key and JWT)
 app.use('/api/*', dualAuth);
@@ -142,6 +146,9 @@ app.get('/api/admin/keys', apiKeyHandlers.listApiKeys);
 app.get('/api/admin/keys/:id', apiKeyHandlers.getApiKey);
 app.patch('/api/admin/keys/:id', apiKeyHandlers.updateApiKey);
 app.delete('/api/admin/keys/:id', apiKeyHandlers.revokeApiKey);
+
+// Skill Package Generation endpoints
+app.post('/api/skills/generate', skillHandlers.generateSkillPackage);
 
 // MCP endpoint
 app.all('/mcp', async (c) => {
