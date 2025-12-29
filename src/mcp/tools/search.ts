@@ -181,7 +181,23 @@ export async function handleAddTags(env: Env, args: any): Promise<any> {
 
 // Helper functions
 
+/**
+ * Escape a query string for SQLite FTS5 MATCH syntax.
+ * FTS5 treats special characters like -, *, :, etc. as operators.
+ * This function wraps each term in double quotes to treat them as literals.
+ */
+function escapeFtsQuery(query: string): string {
+  // Split by whitespace, wrap each term in double quotes to escape special chars
+  return query
+    .split(/\s+/)
+    .filter(term => term.length > 0)
+    .map(term => `"${term.replace(/"/g, '""')}"`) // Escape internal quotes by doubling them
+    .join(' ');
+}
+
 async function searchMemoriesByQuery(db: D1Database, query: string, limit: number, offset: number) {
+  const escapedQuery = escapeFtsQuery(query);
+
   const stmt = db.prepare(`
     SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
@@ -190,15 +206,15 @@ async function searchMemoriesByQuery(db: D1Database, query: string, limit: numbe
     ORDER BY rank, m.updated_at DESC
     LIMIT ? OFFSET ?
   `);
-  
-  const result = await stmt.bind(query, limit, offset).all<any>();
+
+  const result = await stmt.bind(escapedQuery, limit, offset).all<any>();
   
   // Get total count
   const countResult = await db.prepare(`
     SELECT COUNT(*) as count
     FROM memories_fts
     WHERE memories_fts MATCH ?
-  `).bind(query).first<{ count: number }>();
+  `).bind(escapedQuery).first<{ count: number }>();
   
   const memories: Memory[] = [];
   for (const row of result.results || []) {
@@ -271,8 +287,9 @@ async function searchMemoriesByTags(db: D1Database, tagNames: string[], limit: n
 }
 
 async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNames: string[], limit: number, offset: number) {
+  const escapedQuery = escapeFtsQuery(query);
   const placeholders = tagNames.map(() => '?').join(',');
-  
+
   const stmt = db.prepare(`
     SELECT DISTINCT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
@@ -285,9 +302,9 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     ORDER BY rank, m.updated_at DESC
     LIMIT ? OFFSET ?
   `);
-  
-  const result = await stmt.bind(query, ...tagNames, tagNames.length, limit, offset).all<any>();
-  
+
+  const result = await stmt.bind(escapedQuery, ...tagNames, tagNames.length, limit, offset).all<any>();
+
   // Get total count
   const countStmt = db.prepare(`
     SELECT COUNT(DISTINCT m.id) as count
@@ -299,8 +316,8 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     GROUP BY m.id
     HAVING COUNT(DISTINCT t.id) = ?
   `);
-  
-  const countResult = await countStmt.bind(query, ...tagNames, tagNames.length).first<{ count: number }>();
+
+  const countResult = await countStmt.bind(escapedQuery, ...tagNames, tagNames.length).first<{ count: number }>();
   
   const memories: Memory[] = [];
   for (const row of result.results || []) {

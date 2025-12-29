@@ -28,6 +28,22 @@ export async function dualAuth(c: Context<{ Bindings: Env; Variables: Variables 
 
   const token = authHeader.substring(7);
 
+  // Allow any token on localhost for development
+  const hostname = new URL(c.req.url).hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+    c.set('apiKey', {
+      id: 'dev-localhost',
+      entityName: 'localhost-dev',
+    });
+    c.set('auth', {
+      type: 'oauth',
+      apiKeyId: 'dev-localhost',
+      entityName: 'localhost-dev',
+    });
+    await next();
+    return;
+  }
+
   if (token.startsWith('msk_')) {
     return apiKeyAuth(c, next);
   }
