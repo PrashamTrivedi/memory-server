@@ -44,8 +44,11 @@ export function SkillDownload() {
 
       const response = await api.post<SkillGenerateResponse>('/skills/generate');
 
-      if (response.data) {
-        setSkillData(response.data);
+      // The response comes directly (success, download_url, etc. at top level)
+      // Check if it's wrapped in data or direct
+      const data = response.data || response;
+      if (data && (data as SkillGenerateResponse).success) {
+        setSkillData(data as SkillGenerateResponse);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate skill package');
