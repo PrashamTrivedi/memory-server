@@ -164,8 +164,8 @@ export async function getAncestors(c: Context<{ Bindings: Env }>) {
     // Format response based on Accept header
     const markdown = formatTagListAsMarkdown('Ancestor Tags', ancestors, { id: tagId, name: tagName });
     const jsonData = {
-      tag_id: tagId,
-      ancestors
+      success: true,
+      data: { tag_id: tagId, ancestors }
     };
 
     return sendFormattedResponse(c, markdown, jsonData);
@@ -202,8 +202,8 @@ export async function getDescendants(c: Context<{ Bindings: Env }>) {
     // Format response based on Accept header
     const markdown = formatTagListAsMarkdown('Descendant Tags', descendants, { id: tagId, name: tagName });
     const jsonData = {
-      tag_id: tagId,
-      descendants
+      success: true,
+      data: { tag_id: tagId, descendants }
     };
 
     return sendFormattedResponse(c, markdown, jsonData);
@@ -224,7 +224,8 @@ export async function getTagTree(c: Context<{ Bindings: Env }>) {
     // Format response based on Accept header
     const markdown = formatTagTreeAsMarkdown(tree);
     const jsonData = {
-      tree
+      success: true,
+      data: { tree }
     };
 
     return sendFormattedResponse(c, markdown, jsonData);

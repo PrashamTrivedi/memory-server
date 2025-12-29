@@ -12,6 +12,7 @@ code snippets with intelligent tagging and retrieval.
 - 🔍 **Advanced Search** - Full-text search across memories and tags
 - 🌐 **URL Content Fetching** - Automatically fetch and store web content
 - 🤖 **MCP Integration** - Full Model Context Protocol support for AI tools
+- 📦 **Claude Code Skill Download** - One-click skill package with pre-configured MCP setup
 - ⚡ **Cloudflare Workers** - Fast, globally distributed hosting
 - 🗄️ **D1 Database** - Serverless SQL storage
 - 🔄 **Real-time Sync** - KV cache for performance
@@ -376,6 +377,109 @@ Add to your Claude Desktop configuration:
 1. Install an MCP-compatible extension
 2. Add server connection: `YOUR_DEPLOYMENT_URL/mcp`
 
+## Claude Code Skill Download
+
+The Memory Server provides a convenient skill package download feature that allows Claude Code users to quickly set up the MCP integration with a pre-configured skill file and API key.
+
+### Skill Package Generation
+
+**Endpoint:** `POST /api/skills/generate`
+
+**Authentication:** Required (Bearer token or session)
+
+Generates a downloadable skill package containing:
+- `memory-skill/SKILL.md` - Claude Code skill file with memory management instructions
+- `memory-skill/mcp.json` - MCP server configuration with embedded API key
+
+**Response Format:**
+
+```json
+{
+  "success": true,
+  "reused": false,
+  "download_url": "/skills/download/{token}",
+  "expires_in": 14400,
+  "skill_key": {
+    "id": "uuid-here",
+    "entity_name": "skill-download-key",
+    "created_at": 1735000000
+  },
+  "instructions": {
+    "mcp_config_redacted": {
+      "mcpServers": {
+        "memory-server": {
+          "type": "http",
+          "url": "https://your-server.workers.dev/mcp",
+          "headers": {
+            "Authorization": "Bearer [REDACTED]"
+          }
+        }
+      }
+    },
+    "steps": [
+      "Download and extract the ZIP file",
+      "Move the 'memory-skill' folder to your project root or ~/.claude/skills/",
+      "The MCP configuration is included in mcp.json",
+      "Claude Code will automatically detect and use the skill"
+    ]
+  }
+}
+```
+
+**Behavior:**
+- If a valid skill package was generated within the last 4 hours, the existing package is reused (`"reused": true`)
+- New packages are generated when no recent package exists or the previous one has expired
+- The download token is valid for 4 hours (14400 seconds)
+
+### Skill Package Download
+
+**Endpoint:** `GET /skills/download/:token`
+
+**Authentication:** None required (the token serves as authentication)
+
+Downloads the skill package as a ZIP file. The token is obtained from the generate endpoint response.
+
+**Response:**
+- Content-Type: `application/zip`
+- Content-Disposition: `attachment; filename="memory-skill.zip"`
+
+**ZIP Contents:**
+```
+memory-skill.zip
+├── memory-skill/
+│   ├── SKILL.md      # Claude Code skill instructions
+│   └── mcp.json      # MCP configuration with API key
+```
+
+### Installation Steps
+
+1. **Generate the skill package:**
+   ```bash
+   curl -X POST https://your-server.workers.dev/api/skills/generate \
+     -H "Authorization: Bearer YOUR_AUTH_TOKEN" \
+     -H "Content-Type: application/json"
+   ```
+
+2. **Download the package** using the URL from the response:
+   ```bash
+   curl -O https://your-server.workers.dev/skills/download/{token}
+   ```
+
+3. **Extract the ZIP file** to your preferred location:
+   - Project-specific: Extract to your project root directory
+   - Global: Extract to `~/.claude/skills/` for use across all projects
+
+4. **Verify the setup:**
+   - Claude Code will automatically detect the `memory-skill` folder
+   - The MCP configuration in `mcp.json` includes your API key for authentication
+
+### Security Notes
+
+- Download tokens are single-use and expire after 4 hours
+- Each skill package contains a unique API key tied to your account
+- The API key in the package has limited scope for MCP operations only
+- Regenerating a skill package will create a new API key
+
 ## API Endpoints
 
 ### REST API
@@ -413,6 +517,10 @@ curl http://localhost:8787/api/memories \
 - `GET /api/tags/{id}/children` - Get immediate child tags
 - `POST /api/tags/{id}/parent` - Add parent relationship
 - `DELETE /api/tags/{id}/parent/{parentId}` - Remove parent relationship
+
+#### Skill Package
+- `POST /api/skills/generate` - Generate skill download package (requires auth)
+- `GET /skills/download/:token` - Download skill package ZIP (token auth)
 
 ### Response Format Examples
 
