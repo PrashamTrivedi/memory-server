@@ -142,8 +142,33 @@ curl -X POST http://localhost:8787/api/memories/<id>/promote \
 
 ---
 
+### 7. Verify UI Dashboard
+
+1. **Navigate to Memory Server UI**
+2. **Click "Temporary" in the navigation bar**
+3. **Verify dashboard displays:**
+   - Total count of temporary memories
+   - Urgent count (≤3 days until expiry) in red
+   - Soon count (4-7 days) in yellow
+   - Safe count (>7 days) in green
+
+4. **Verify memory cards show:**
+   - Stage badge (Stage 1 or Stage 2)
+   - Days until expiry with color-coded urgency
+   - Progress bar toward next stage
+   - Access count
+   - Last accessed timestamp
+
+5. **Test promote from UI:**
+   - Click star icon on a memory card
+   - Verify spinner appears during promotion
+   - Verify memory disappears after successful promotion
+
+---
+
 ## Key Files Modified
 
+### Backend
 | File | Change |
 |------|--------|
 | `types/index.ts` | New `TemporaryMemoryWithMetadata` type, updated `TemporaryMemory` |
@@ -153,6 +178,26 @@ curl -X POST http://localhost:8787/api/memories/<id>/promote \
 | `src/mcp/tools/memory.ts` | `review_temporary_memories` tool |
 | `src/mcp/server.ts` | Tool registration |
 | `src/mcp/utils/formatters.ts` | `formatTemporaryMemoriesAsMarkdown` |
+
+### Frontend (UI)
+| File | Change |
+|------|--------|
+| `ui/src/types/memory.ts` | `TemporaryMemoryWithMetadata` type |
+| `ui/src/api/memory.ts` | `useTemporaryMemories()`, `usePromoteMemory()` hooks |
+| `ui/src/components/TemporaryMemoryCard.tsx` | Card component with lifecycle display |
+| `ui/src/components/TemporaryMemoryCard.css` | Card styling with urgency colors |
+| `ui/src/pages/TemporaryMemoryReview.tsx` | Review page with stats dashboard |
+| `ui/src/pages/TemporaryMemoryReview.css` | Page styling |
+| `ui/src/pages/index.ts` | Export new page |
+| `ui/src/App.tsx` | Navigation for "Temporary" view |
+
+---
+
+## Commits
+
+1. `41fcc3e ✨ feat: Add stage-based lifecycle and review interface for temporary memories`
+2. `cdcb7bf ✨ feat: Add temporary memories review UI with lifecycle dashboard`
+3. `e29b705 🐛 fix: Add defensive defaults for legacy temporary memory data`
 
 ---
 
@@ -165,4 +210,6 @@ curl -X POST http://localhost:8787/api/memories/<id>/promote \
 - [x] Sorted by urgency (most urgent first)
 - [x] Manual promotion still works
 - [x] MCP tool for review interface
+- [x] UI dashboard with stats and memory cards
+- [x] UI promote functionality
 - [x] Documentation updated
