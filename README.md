@@ -17,6 +17,7 @@ code snippets with intelligent tagging and retrieval.
 - 🗄️ **D1 Database** - Serverless SQL storage
 - 🔄 **Real-time Sync** - KV cache for performance
 - 🎯 **Workflow Prompts** - Pre-built AI workflows for memory management
+- ⏳ **Temporary Memories** - TTL-based memories that auto-promote with repeated access
 
 ## Hierarchical Tagging System
 
@@ -63,9 +64,93 @@ POST /api/tags/create-with-parent
 ### Benefits
 
 - **Automatic Organization**: Tags are automatically organized in a hierarchy
-- **Better Discovery**: Find related memories through parent-child relationships  
+- **Better Discovery**: Find related memories through parent-child relationships
 - **Flexible Structure**: Mix hierarchical and simple tags as needed
 - **Visual Tree View**: See your entire tag structure in the UI
+
+## Temporary Memories
+
+Temporary memories provide a stage-based lifecycle for memories that may not need permanent storage. They automatically expire if unused, but promote to permanent storage when accessed repeatedly. A dedicated review interface makes it easy to rescue important memories before they expire.
+
+### Lifecycle Stages
+
+Temporary memories progress through two stages with increasing TTL and access thresholds:
+
+**Stage 1 (14-day TTL):**
+- Initial stage when memory is created with `temporary: true`
+- TTL: 14 days from last access
+- Advancement threshold: 5 accesses
+- Upon reaching 5 accesses, automatically advances to Stage 2
+
+**Stage 2 (28-day TTL):**
+- Extended stage after reaching 5 accesses
+- TTL: 28 days from last access
+- Auto-promotion threshold: 15 total accesses
+- Upon reaching 15 total accesses, automatically promotes to permanent storage
+
+### Lifecycle Metadata
+
+Each temporary memory tracks:
+- **access_count** - Total number of times the memory has been accessed
+- **stage** - Current stage (1 or 2)
+- **last_accessed** - Timestamp of most recent access
+- **days_until_expiry** - Calculated based on TTL and last access time
+
+### Key Behaviors
+
+- **Transparent to Users**: Temporary status is hidden from API responses - temporary memories appear identical to permanent ones
+- **Automatic Expiration**: Memories not accessed within TTL are automatically deleted by Cloudflare KV
+- **Manual Promotion**: Use `POST /api/memories/:id/promote` or the `promote_memory` MCP tool to immediately promote a temporary memory
+
+### Creating Temporary Memories
+
+**Via REST API:**
+```json
+POST /api/memories
+{
+  "name": "Quick Note",
+  "content": "This might not be important long-term",
+  "tags": ["temporary", "notes"],
+  "temporary": true
+}
+```
+
+**Via MCP Tool:**
+```json
+{
+  "name": "add_memory",
+  "arguments": {
+    "name": "Quick Note",
+    "content": "This might not be important long-term",
+    "tags": ["temporary", "notes"],
+    "temporary": true
+  }
+}
+```
+
+### Promoting Temporary Memories
+
+**Via REST API:**
+```bash
+POST /api/memories/:id/promote
+```
+
+**Via MCP Tool:**
+```json
+{
+  "name": "promote_memory",
+  "arguments": {
+    "id": "memory-uuid-here"
+  }
+}
+```
+
+### Use Cases
+
+- **Experimental Notes**: Store quick thoughts that may not be valuable long-term
+- **Session Data**: Capture context that's only relevant for a short period
+- **Draft Content**: Save work-in-progress that needs validation before permanent storage
+- **Trial Information**: Test storing data before committing to permanent storage
 
 ## Quick Start
 
@@ -93,8 +178,9 @@ POST /api/tags/create-with-parent
    # Create D1 database
    wrangler d1 create memory-db
 
-   # Create KV namespace  
+   # Create KV namespaces
    wrangler kv namespace create "CACHE_KV"
+   wrangler kv namespace create "TEMP_MEMORIES_KV"
 
    # Run migrations
    npm run db:migrate
@@ -208,7 +294,7 @@ https://your-worker-subdomain.your-subdomain.workers.dev/mcp
 
 ### Available MCP Tools
 
-The server exposes 7 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
+The server exposes 9 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
 
 #### Core Memory Tools
 
@@ -219,11 +305,12 @@ The server exposes 7 memory management tools via MCP. All tools return responses
   "name": "My Development Note",
   "content": "Important information about React hooks",
   "url": "https://react.dev/hooks",
-  "tags": ["programming>javascript", "frontend>react", "tutorial"]
+  "tags": ["programming>javascript", "frontend>react", "tutorial"],
+  "temporary": false
 }
 ```
 
-*Supports hierarchical tags using "parent>child" format alongside simple tags*
+*Supports hierarchical tags using "parent>child" format alongside simple tags. Set `temporary: true` to create a memory with TTL-based lifecycle.*
 
 Response includes human-readable memory details in markdown and complete memory object with metadata in JSON format.
 
@@ -283,6 +370,27 @@ Returns formatted search results with matching memories, search criteria summary
   "tags": ["tutorial", "beginner"]
 }
 ```
+
+**`review_temporary_memories`** - Review temporary memories with lifecycle status
+
+```json
+{
+  "limit": 50,
+  "offset": 0
+}
+```
+
+*Lists all temporary memories with their complete lifecycle metadata. Shows access count, current stage, last accessed time, and days until expiry. Perfect for reviewing and rescuing important memories before they expire. Includes pagination support.*
+
+**`promote_memory`** - Promote temporary memory to permanent
+
+```json
+{
+  "id": "memory-uuid-here"
+}
+```
+
+*Immediately promotes a temporary memory to permanent storage without waiting for the auto-promotion threshold. Returns an error if the memory is already permanent or does not exist.*
 
 ### MCP Resources
 
@@ -501,10 +609,12 @@ curl http://localhost:8787/api/memories \
 
 #### Memory Management
 - `GET /api/memories` - List memories
-- `POST /api/memories` - Create memory (supports hierarchical tags)
+- `POST /api/memories` - Create memory (supports hierarchical tags and temporary flag)
 - `GET /api/memories/{id}` - Get memory
 - `PUT /api/memories/{id}` - Update memory (supports hierarchical tags)
 - `DELETE /api/memories/{id}` - Delete memory
+- `POST /api/memories/{id}/promote` - Promote temporary memory to permanent
+- `GET /api/memories/temporary` - List temporary memories with lifecycle metadata (access count, stage, last accessed, days until expiry)
 - `GET /api/memories/stats` - Get memory statistics
 - `GET /api/memories/search` - Search memories
 
@@ -576,10 +686,13 @@ src/
 ├── handlers/             # HTTP request handlers
 │   ├── memory.ts         # Memory CRUD operations
 │   └── tagHierarchy.ts   # Tag management
+├── services/             # Business logic services
+│   ├── temporaryMemory.ts # Temporary memory TTL management
+│   └── tagHierarchy.ts   # Tag hierarchy operations
 ├── mcp/                  # MCP implementation
 │   ├── server.ts         # MCP server setup
 │   ├── tools/            # MCP tool implementations
-│   ├── resources/        # MCP resource handlers  
+│   ├── resources/        # MCP resource handlers
 │   ├── prompts/          # Workflow prompt definitions
 │   └── transport/        # HTTP transport for Cloudflare Workers
 └── types/                # TypeScript type definitions
@@ -598,7 +711,7 @@ npm run test         # Run tests
 
 ### Environment Variables
 
-Configure in `wrangler.toml`:
+Configure in `wrangler.toml` or `wrangler.jsonc`:
 
 ```toml
 [env.production.vars]
@@ -610,8 +723,17 @@ database_name = "memory-db"
 database_id = "your-d1-database-id"
 
 [[env.production.kv_namespaces]]
-binding = "CACHE_KV" 
-id = "your-kv-namespace-id"
+binding = "CACHE_KV"
+id = "your-cache-kv-namespace-id"
+
+[[env.production.kv_namespaces]]
+binding = "TEMP_MEMORIES_KV"
+id = "your-temp-memories-kv-namespace-id"
+```
+
+**Note:** The `TEMP_MEMORIES_KV` namespace is required for the temporary memories feature. Create it with:
+```bash
+wrangler kv namespace create "TEMP_MEMORIES_KV"
 ```
 
 ## Contributing

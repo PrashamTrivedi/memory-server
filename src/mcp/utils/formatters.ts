@@ -1,4 +1,4 @@
-import type { Memory } from '../../../types/index.js';
+import type { Memory, TemporaryMemoryWithMetadata } from '../../../types/index.js';
 
 /**
  * MCP Tool Response Content Item
@@ -417,4 +417,77 @@ export function formatStatsAsMarkdown(stats: {
 
 ## Summary
 ${stats.total === 0 ? 'No memories stored yet.' : `You have ${stats.total} memories, with ${Math.round((stats.tagged / stats.total) * 100)}% tagged.`}`;
+}
+
+/**
+ * Format temporary memories list with lifecycle metadata for review endpoint
+ *
+ * Displays temporary memories sorted by urgency with full lifecycle status visible.
+ * Used exclusively by the review/rescue interface to help users manage expiring memories.
+ *
+ * @param memories - Array of temporary memories with lifecycle metadata
+ * @param pagination - Pagination metadata
+ * @returns Markdown-formatted review list with urgency indicators
+ */
+export function formatTemporaryMemoriesAsMarkdown(
+  memories: TemporaryMemoryWithMetadata[],
+  pagination: PaginationInfo
+): string {
+  const { total, offset, has_more } = pagination;
+
+  let markdown = `# Temporary Memories Review
+
+**Total**: ${total} temporary memories
+**Purpose**: Review and rescue memories before expiry
+
+`;
+
+  if (memories.length === 0) {
+    markdown += `No temporary memories found.
+
+All memories are permanent or none have been created yet.
+`;
+    return markdown;
+  }
+
+  memories.forEach((memory, index) => {
+    const position = offset + index + 1;
+    const urgency =
+      memory.days_until_expiry <= 3
+        ? '🔴 URGENT'
+        : memory.days_until_expiry <= 7
+          ? '🟡 Soon'
+          : '🟢 Safe';
+
+    const accessTarget = memory.stage === 1 ? 5 : 15;
+    const progressText = `${memory.access_count}/${accessTarget} (${memory.stage === 1 ? 'to Stage 2' : 'to Permanent'})`;
+
+    markdown += `## ${position}. ${memory.name}
+
+${truncateContent(memory.content, 150)}
+
+### Lifecycle Status
+- **Stage**: ${memory.stage}/2
+- **Access Count**: ${progressText}
+- **Days Until Expiry**: ${memory.days_until_expiry} ${urgency}
+- **Last Accessed**: ${formatDate(memory.last_accessed)}
+
+### Memory Details
+- **ID**: \`${memory.id}\`
+- **Tags**: ${memory.tags.length > 0 ? memory.tags.join(', ') : 'None'}
+- **Created**: ${formatDate(memory.created_at)}
+
+💡 Use \`promote_memory\` or POST \`/api/memories/${memory.id}/promote\` to save permanently
+
+---
+
+`;
+  });
+
+  markdown += `## Pagination
+- **Showing**: ${offset + 1} to ${Math.min(offset + memories.length, total)}
+- **Total**: ${total}
+- **Has More**: ${has_more ? 'Yes' : 'No'}`;
+
+  return markdown;
 }

@@ -1,5 +1,6 @@
 import type { Env } from '../../index';
 import { Memory } from '../../../types/index';
+import { TemporaryMemoryService } from '../../services/temporaryMemory';
 import {
   formatSearchResultsAsMarkdown,
   formatMemoryAsMarkdown,
@@ -59,30 +60,36 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
     const tags = args.tags;
     const limit = Math.min(args.limit || 10, 100);
     const offset = args.offset || 0;
-    
+
     if (!query && !tags) {
       throw new Error('Either query or tags parameter is required');
     }
 
-    let memories: Memory[] = [];
-    let total = 0;
-
+    // Search D1 (permanent memories)
+    let d1Memories: Memory[] = [];
     if (query && tags && tags.length > 0) {
-      // Search by both text and tags
-      const result = await searchMemoriesByQueryAndTags(env.DB, query, tags, limit, offset);
-      memories = result.memories;
-      total = result.total;
+      const result = await searchMemoriesByQueryAndTags(env.DB, query, tags, 1000, 0);
+      d1Memories = result.memories;
     } else if (query) {
-      // Search by text only
-      const result = await searchMemoriesByQuery(env.DB, query, limit, offset);
-      memories = result.memories;
-      total = result.total;
+      const result = await searchMemoriesByQuery(env.DB, query, 1000, 0);
+      d1Memories = result.memories;
     } else if (tags && tags.length > 0) {
-      // Search by tags only
-      const result = await searchMemoriesByTags(env.DB, tags, limit, offset);
-      memories = result.memories;
-      total = result.total;
+      const result = await searchMemoriesByTags(env.DB, tags, 1000, 0);
+      d1Memories = result.memories;
     }
+
+    // Search temporary memories in KV
+    const tempMemories = await TemporaryMemoryService.search(env, query || '', tags);
+
+    // Merge and sort by updated_at desc
+    const allMemories = [...d1Memories, ...tempMemories].sort(
+      (a, b) => b.updated_at - a.updated_at
+    );
+
+    const total = allMemories.length;
+
+    // Apply pagination
+    const paginated = allMemories.slice(offset, offset + limit);
 
     const pagination = {
       total,
@@ -92,11 +99,11 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
     };
 
     // Format as markdown
-    const markdown = formatSearchResultsAsMarkdown(memories, query, tags, pagination);
+    const markdown = formatSearchResultsAsMarkdown(paginated, query, tags, pagination);
     const structuredData = {
       success: true,
       data: {
-        memories,
+        memories: paginated,
         pagination,
         query: query || undefined,
         tags: tags || undefined

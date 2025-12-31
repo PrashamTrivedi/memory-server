@@ -59,3 +59,29 @@ export interface SearchMemoryResponse {
     limit: number;
   };
 }
+
+// Temporary memory with lifecycle metadata for review interface
+export interface TemporaryMemoryWithMetadata {
+  id: string;
+  name: string;
+  content: string;
+  url?: string;
+  tags: string[];
+  created_at: number;
+  updated_at: number;
+  // Lifecycle metadata
+  access_count: number;
+  stage: 1 | 2;
+  last_accessed: number;
+  days_until_expiry: number;
+}
+
+export interface TemporaryMemoryListResponse {
+  memories: TemporaryMemoryWithMetadata[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+}

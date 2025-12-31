@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { TagManagement, MemoryManagement, ApiKeys, SkillDownload } from './pages';
+import { TagManagement, MemoryManagement, TemporaryMemoryReview, ApiKeys, SkillDownload } from './pages';
 import { useTheme } from './contexts/ThemeContext';
 import { useMemoryStats } from './api/memory';
 import { api } from './api/client';
 import './App.css';
 import './components/TagHierarchy.css';
 
-type AppView = 'home' | 'tags' | 'memories' | 'api-keys' | 'skill-download';
+type AppView = 'home' | 'tags' | 'memories' | 'temporary-memories' | 'api-keys' | 'skill-download';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('memories'); // Default to memories view
@@ -37,6 +37,8 @@ function App() {
         return <TagManagement />;
       case 'memories':
         return <MemoryManagement />;
+      case 'temporary-memories':
+        return <TemporaryMemoryReview />;
       case 'api-keys':
         return <ApiKeys />;
       case 'skill-download':
@@ -197,7 +199,7 @@ function App() {
             </svg>
             Home
           </button>
-          <button 
+          <button
             className={`nav-button ${currentView === 'memories' ? 'active' : ''}`}
             onClick={() => setCurrentView('memories')}
           >
@@ -205,6 +207,16 @@ function App() {
               <path d="M9 12H15M9 16H15M17 21H7C6.46957 21 5.96086 20.7893 5.58579 20.4142C5.21071 20.0391 5 19.5304 5 19V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H12.586C12.8512 3.00006 13.1055 3.10545 13.293 3.293L18.707 8.707C18.8946 8.89449 18.9999 9.14881 19 9.414V19C19 19.5304 18.7893 20.0391 18.4142 20.4142C18.0391 20.7893 17.5304 21 17 21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Memories
+          </button>
+          <button
+            className={`nav-button ${currentView === 'temporary-memories' ? 'active' : ''}`}
+            onClick={() => setCurrentView('temporary-memories')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+              <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Temporary
           </button>
           <button
             className={`nav-button ${currentView === 'tags' ? 'active' : ''}`}

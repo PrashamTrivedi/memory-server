@@ -14,6 +14,7 @@ export interface CreateMemoryRequest {
   content: string;
   url?: string;
   tags?: string[];
+  temporary?: boolean;
 }
 
 export interface UpdateMemoryRequest {
@@ -127,6 +128,29 @@ export interface TagTreeResponse {
   tree: TagTreeNode[];
 }
 
+// Temporary memory stored in KV with stage-based lifecycle
+export interface TemporaryMemory extends Memory {
+  access_count: number;
+  stage: 1 | 2;
+  last_accessed: number;
+}
+
+// Type for review endpoint response with lifecycle metadata visible
+export interface TemporaryMemoryWithMetadata {
+  id: string;
+  name: string;
+  content: string;
+  url?: string;
+  tags: string[];
+  created_at: number;
+  updated_at: number;
+  // Lifecycle metadata (visible in review interface only)
+  access_count: number;
+  stage: 1 | 2;
+  last_accessed: number;
+  days_until_expiry: number;
+}
+
 // Rate limiting interface
 export interface RateLimit {
   limit(options: { key: string }): Promise<{
@@ -138,6 +162,7 @@ export interface RateLimit {
 export interface Env {
   DB: D1Database;
   CACHE_KV: KVNamespace;
+  TEMP_MEMORIES_KV: KVNamespace;
   BROWSER: Fetcher;
   ENVIRONMENT: string;
 

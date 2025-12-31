@@ -9,6 +9,7 @@ import {
 } from '../../types/index';
 import { MemoryError, MemoryNotFoundError } from '../errors/memoryErrors';
 import { TagHierarchyService } from '../services/tagHierarchy';
+import { TemporaryMemoryService } from '../services/temporaryMemory';
 import { sendFormattedResponse, prefersMarkdown } from '../utils/responseFormatter';
 import {
   formatMemoryAsMarkdown,
@@ -16,7 +17,8 @@ import {
   formatSearchResultsAsMarkdown,
   formatSuccessResponse,
   formatStatsAsMarkdown,
-  formatErrorResponse
+  formatErrorResponse,
+  formatTemporaryMemoriesAsMarkdown
 } from '../mcp/utils/formatters';
 
 /**
@@ -26,7 +28,7 @@ import {
 export async function createMemory(c: Context<{ Bindings: Env }>) {
   try {
     const body = await c.req.json<CreateMemoryRequest>();
-    
+
     // Validate required fields
     if (!body.name || !body.content) {
       return returnValidationError(c, 'Missing required fields: name and content are required');
@@ -35,7 +37,7 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
     // Generate UUID for new memory
     const id = uuidv4();
     const now = Math.floor(Date.now() / 1000);
-    
+
     // Handle URL content fetching if URL provided
     let content = body.content;
     if (body.url) {
@@ -45,24 +47,42 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
       }
     }
 
-    // Insert memory into database
-    const stmt = c.env.DB.prepare(`
-      INSERT INTO memories (id, name, content, url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    
-    await stmt.bind(id, body.name, content, body.url || null, now, now).run();
+    let memory: Memory;
 
-    // Handle tags if provided
-    if (body.tags && body.tags.length > 0) {
-      await assignTagsToMemory(c.env.DB, id, body.tags);
-    }
+    if (body.temporary) {
+      // Create temporary memory in KV
+      const tempMemory: Memory = {
+        id,
+        name: body.name,
+        content,
+        url: body.url,
+        tags: body.tags || [],
+        created_at: now,
+        updated_at: now,
+      };
+      await TemporaryMemoryService.create(c.env, tempMemory);
+      memory = tempMemory;
+    } else {
+      // Insert permanent memory into database
+      const stmt = c.env.DB.prepare(`
+        INSERT INTO memories (id, name, content, url, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
 
-    // Fetch the created memory with tags
-    const memory = await getMemoryById(c.env.DB, id);
+      await stmt.bind(id, body.name, content, body.url || null, now, now).run();
 
-    if (!memory) {
-      throw new MemoryNotFoundError(id);
+      // Handle tags if provided
+      if (body.tags && body.tags.length > 0) {
+        await assignTagsToMemory(c.env.DB, id, body.tags);
+      }
+
+      // Fetch the created memory with tags
+      const createdMemory = await getMemoryById(c.env.DB, id);
+
+      if (!createdMemory) {
+        throw new MemoryNotFoundError(id);
+      }
+      memory = createdMemory;
     }
 
     // Format response based on Accept header
@@ -91,8 +111,21 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
       return returnValidationError(c, 'Memory ID is required');
     }
 
+    // First check temporary memories in KV (also handles TTL extension/promotion)
+    const tempResult = await TemporaryMemoryService.handleAccess(c.env, id);
+    if (tempResult.memory) {
+      // Return memory (may have been promoted)
+      const markdown = formatMemoryAsMarkdown(tempResult.memory);
+      const jsonData = {
+        success: true,
+        data: tempResult.memory
+      };
+      return sendFormattedResponse(c, markdown, jsonData);
+    }
+
+    // Fall back to D1 (permanent memories)
     const memory = await getMemoryById(c.env.DB, id);
-    
+
     if (!memory) {
       throw new MemoryNotFoundError(id);
     }
@@ -106,7 +139,7 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
         await c.env.DB.prepare(`
           UPDATE memories SET content = ?, updated_at = ? WHERE id = ?
         `).bind(updatedContent, Math.floor(Date.now() / 1000), id).run();
-        
+
         memory.content = updatedContent;
         memory.updated_at = Math.floor(Date.now() / 1000);
       }
@@ -134,26 +167,21 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
   try {
     const limit = Math.min(parseInt(c.req.query('limit') || '10'), 100);
     const offset = parseInt(c.req.query('offset') || '0');
-    
-    // Get memories with pagination
+
+    // Get permanent memories from D1
     const stmt = c.env.DB.prepare(`
       SELECT id, name, content, url, created_at, updated_at
       FROM memories
       ORDER BY updated_at DESC, created_at DESC
-      LIMIT ? OFFSET ?
     `);
-    
-    const result = await stmt.bind(limit, offset).all<MemoryRow>();
-    
-    // Get total count
-    const countResult = await c.env.DB.prepare('SELECT COUNT(*) as count FROM memories').first<{ count: number }>();
-    const total = countResult?.count || 0;
-    
-    // Enrich memories with tags
-    const memories: Memory[] = [];
+
+    const result = await stmt.all<MemoryRow>();
+
+    // Enrich D1 memories with tags
+    const d1Memories: Memory[] = [];
     for (const row of result.results || []) {
       const tags = await getMemoryTags(c.env.DB, row.id);
-      memories.push({
+      d1Memories.push({
         id: row.id,
         name: row.name,
         content: row.content,
@@ -164,6 +192,19 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
       });
     }
 
+    // Get temporary memories from KV
+    const tempMemories = await TemporaryMemoryService.listAll(c.env);
+
+    // Merge and sort by updated_at desc
+    const allMemories = [...d1Memories, ...tempMemories].sort(
+      (a, b) => b.updated_at - a.updated_at
+    );
+
+    const total = allMemories.length;
+
+    // Apply pagination
+    const paginated = allMemories.slice(offset, offset + limit);
+
     const pagination = {
       total,
       limit,
@@ -172,11 +213,11 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
     };
 
     // Format response based on Accept header
-    const markdown = formatMemoryListAsMarkdown(memories, pagination);
+    const markdown = formatMemoryListAsMarkdown(paginated, pagination);
     const jsonData = {
       success: true,
       data: {
-        memories,
+        memories: paginated,
         pagination
       }
     };
@@ -299,7 +340,18 @@ export async function deleteMemory(c: Context<{ Bindings: Env }>) {
       return returnValidationError(c, 'Memory ID is required');
     }
 
-    // Verify memory exists
+    // Try to delete from temporary memories first
+    const deletedTemp = await TemporaryMemoryService.delete(c.env, id);
+    if (deletedTemp) {
+      const markdown = formatSuccessResponse(`Memory deleted successfully`, { id, deleted: true });
+      const jsonData = {
+        success: true,
+        data: { deleted: true, id }
+      };
+      return sendFormattedResponse(c, markdown, jsonData);
+    }
+
+    // Fall back to D1 - verify memory exists
     const memory = await getMemoryById(c.env.DB, id);
     if (!memory) {
       throw new MemoryNotFoundError(id);
@@ -371,32 +423,38 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     const tagsParam = c.req.query('tags');
     const limit = Math.min(parseInt(c.req.query('limit') || '10'), 100);
     const offset = parseInt(c.req.query('offset') || '0');
-    
+
     if (!query && !tagsParam) {
       return returnValidationError(c, 'Either query or tags parameter is required');
     }
 
-    let memories: Memory[] = [];
-    let total = 0;
-    
-    if (query && tagsParam) {
-      // Search by both text and tags
-      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
-      const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, limit, offset);
-      memories = result.memories;
-      total = result.total;
+    const tags = tagsParam ? tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined;
+
+    // Search D1 (permanent memories)
+    let d1Memories: Memory[] = [];
+    if (query && tags && tags.length > 0) {
+      const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, 1000, 0);
+      d1Memories = result.memories;
     } else if (query) {
-      // Search by text only
-      const result = await searchMemoriesByQuery(c.env.DB, query, limit, offset);
-      memories = result.memories;
-      total = result.total;
-    } else if (tagsParam) {
-      // Search by tags only
-      const tags = tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean);
-      const result = await searchMemoriesByTags(c.env.DB, tags, limit, offset);
-      memories = result.memories;
-      total = result.total;
+      const result = await searchMemoriesByQuery(c.env.DB, query, 1000, 0);
+      d1Memories = result.memories;
+    } else if (tags && tags.length > 0) {
+      const result = await searchMemoriesByTags(c.env.DB, tags, 1000, 0);
+      d1Memories = result.memories;
     }
+
+    // Search temporary memories in KV
+    const tempMemories = await TemporaryMemoryService.search(c.env, query || '', tags);
+
+    // Merge and sort by updated_at desc
+    const allMemories = [...d1Memories, ...tempMemories].sort(
+      (a, b) => b.updated_at - a.updated_at
+    );
+
+    const total = allMemories.length;
+
+    // Apply pagination
+    const paginated = allMemories.slice(offset, offset + limit);
 
     const pagination = {
       total,
@@ -405,17 +463,94 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
       has_more: offset + limit < total
     };
 
-    const tags = tagsParam ? tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined;
-
     // Format response based on Accept header
-    const markdown = formatSearchResultsAsMarkdown(memories, query, tags, pagination);
+    const markdown = formatSearchResultsAsMarkdown(paginated, query, tags, pagination);
     const jsonData = {
       success: true,
       data: {
-        memories,
+        memories: paginated,
         pagination,
         query: query || undefined,
         tags
+      }
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
+
+  } catch (error) {
+    return handleMemoryError(error, c);
+  }
+}
+
+/**
+ * Promote a temporary memory to permanent
+ * POST /api/memories/:id/promote
+ */
+export async function promoteMemory(c: Context<{ Bindings: Env }>) {
+  try {
+    const id = c.req.param('id');
+
+    if (!id) {
+      return returnValidationError(c, 'Memory ID is required');
+    }
+
+    // Check if exists as temporary
+    const exists = await TemporaryMemoryService.exists(c.env, id);
+    if (!exists) {
+      // Check if already permanent
+      const permanent = await getMemoryById(c.env.DB, id);
+      if (permanent) {
+        return returnValidationError(c, 'Memory is already permanent', 400);
+      }
+      throw new MemoryNotFoundError(id);
+    }
+
+    // Promote the memory
+    const memory = await TemporaryMemoryService.promote(c.env, id);
+
+    // Format response based on Accept header
+    const markdown = formatSuccessResponse(`Memory promoted to permanent`, { id, promoted: true });
+    const jsonData = {
+      success: true,
+      data: { promoted: true, id, memory }
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
+
+  } catch (error) {
+    return handleMemoryError(error, c);
+  }
+}
+
+/**
+ * List temporary memories with lifecycle metadata
+ * GET /api/memories/temporary
+ */
+export async function listTemporaryMemories(c: Context<{ Bindings: Env }>) {
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') || '50'), 100);
+    const offset = parseInt(c.req.query('offset') || '0');
+
+    // Get temporary memories with full metadata
+    const allTemp = await TemporaryMemoryService.listAllWithMetadata(c.env);
+
+    const total = allTemp.length;
+    const paginated = allTemp.slice(offset, offset + limit);
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format response with lifecycle metadata visible
+    const markdown = formatTemporaryMemoriesAsMarkdown(paginated, pagination);
+    const jsonData = {
+      success: true,
+      data: {
+        memories: paginated,
+        pagination
       }
     };
 
