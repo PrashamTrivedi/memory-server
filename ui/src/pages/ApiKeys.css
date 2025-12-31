@@ -260,12 +260,84 @@
   font-weight: 700;
   transition: all var(--transition-base);
   box-shadow: var(--shadow-sm);
+  margin-top: var(--spacing-lg);
 }
 
 .dismiss-key-btn:hover {
   background: var(--color-error);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+/* MCP Configuration Section */
+.mcp-config-section {
+  margin-top: var(--spacing-xl);
+  background: var(--color-surface);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.mcp-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.mcp-config-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.copy-config-btn {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transition: all var(--transition-base);
+}
+
+.copy-config-btn:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.mcp-config-code {
+  background: var(--color-background-secondary);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  border: 1px solid var(--color-border-light);
+  white-space: pre;
+}
+
+.mcp-config-note {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  padding: var(--spacing-sm);
+  background: var(--color-info-light);
+  border-radius: var(--border-radius-sm);
+  border-left: 3px solid var(--color-primary);
+}
+
+.mcp-config-note strong {
+  color: var(--color-text-primary);
 }
 
 /* Create Form */

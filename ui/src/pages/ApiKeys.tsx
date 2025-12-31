@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
+import { generateMcpConfig, getServerUrl, redactApiKey } from '../utils/mcpConfig';
 import './ApiKeys.css';
 
 interface ApiKey {
@@ -28,6 +29,7 @@ export function ApiKeys() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<NewApiKey | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Form state
   const [entityName, setEntityName] = useState('');
@@ -98,8 +100,9 @@ export function ApiKeys() {
     return new Date(timestamp * 1000).toLocaleString();
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, message = 'Copied to clipboard!') => {
     navigator.clipboard.writeText(text);
+    setToastMessage(message);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
@@ -158,7 +161,7 @@ export function ApiKeys() {
             <div className="new-key-value">
               <span className="new-key-text">{newlyCreatedKey.key}</span>
               <button
-                onClick={() => copyToClipboard(newlyCreatedKey.key)}
+                onClick={() => copyToClipboard(newlyCreatedKey.key, 'API key copied to clipboard!')}
                 className="copy-key-btn"
               >
                 📋 Copy
@@ -172,6 +175,32 @@ export function ApiKeys() {
             {newlyCreatedKey.expires_at && (
               <p><strong>Expires:</strong> {formatDate(newlyCreatedKey.expires_at)}</p>
             )}
+          </div>
+
+          <div className="mcp-config-section">
+            <div className="mcp-config-header">
+              <h3>MCP Configuration</h3>
+              <button
+                onClick={() => {
+                  const config = generateMcpConfig(getServerUrl(), newlyCreatedKey.key);
+                  copyToClipboard(JSON.stringify(config, null, 2), 'MCP configuration copied!');
+                }}
+                className="copy-config-btn"
+              >
+                Copy Full Config
+              </button>
+            </div>
+            <pre className="mcp-config-code">
+              {JSON.stringify(
+                generateMcpConfig(getServerUrl(), redactApiKey(newlyCreatedKey.key)),
+                null,
+                2
+              )}
+            </pre>
+            <p className="mcp-config-note">
+              <strong>Note:</strong> The API key shown above is redacted. Click "Copy Full Config"
+              to copy the complete configuration with your actual API key.
+            </p>
           </div>
 
           <button
@@ -299,7 +328,7 @@ export function ApiKeys() {
       {/* Toast Notification */}
       {showToast && (
         <div className="toast">
-          ✓ API key copied to clipboard!
+          ✓ {toastMessage}
         </div>
       )}
     </div>
