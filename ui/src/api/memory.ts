@@ -6,7 +6,8 @@ import {
   MemoryListResponse,
   SearchMemoryRequest,
   SearchMemoryResponse,
-  MemoryStats
+  MemoryStats,
+  TemporaryMemoryListResponse
 } from '../types/memory'
 import { api } from './client'
 
@@ -81,6 +82,22 @@ class MemoryApiClient {
       // If stats endpoint doesn't exist, return default stats
       return {total: 0, recent: 0, tagged: 0}
     }
+  }
+
+  async getTemporaryMemories(limit: number = 50, offset: number = 0): Promise<TemporaryMemoryListResponse> {
+    const response = await api.get<TemporaryMemoryListResponse>(`/memories/temporary?limit=${limit}&offset=${offset}`)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch temporary memories')
+    }
+    return response.data
+  }
+
+  async promoteMemory(id: string): Promise<Memory> {
+    const response = await api.post<{promoted: boolean; id: string; memory: Memory}>(`/memories/${id}/promote`, {})
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to promote memory')
+    }
+    return response.data.memory
   }
 }
 
@@ -157,6 +174,24 @@ export function useDeleteMemory() {
 
   return useMutation({
     mutationFn: (id: string) => memoryApi.deleteMemory(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({queryKey: ['memories']})
+    },
+  })
+}
+
+export function useTemporaryMemories(limit: number = 50, offset: number = 0) {
+  return useQuery({
+    queryKey: ['memories', 'temporary', limit, offset],
+    queryFn: () => memoryApi.getTemporaryMemories(limit, offset),
+  })
+}
+
+export function usePromoteMemory() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => memoryApi.promoteMemory(id),
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['memories']})
     },
