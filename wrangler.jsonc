@@ -39,12 +39,14 @@
       "database_id": "8331bbd8-20cb-40b3-a12f-52851bc08227"
     }
   ],
-  // KV binding for caching URL content
+  // KV namespaces
   "kv_namespaces": [
+    // Cache for URL content (5-day TTL)
     {
       "binding": "CACHE_KV",
       "id": "32ccd77eecf84aa08f3ded49aeb8ca69"
     },
+    // Temporary memories storage (14-28 day TTL, auto-promotes after 3 accesses)
     {
       "binding": "TEMP_MEMORIES_KV",
       "id": "temp-memories-kv-id-placeholder"
