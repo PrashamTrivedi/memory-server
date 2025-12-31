@@ -70,14 +70,31 @@ POST /api/tags/create-with-parent
 
 ## Temporary Memories
 
-Temporary memories provide a TTL-based lifecycle for memories that may not need permanent storage. They automatically expire if unused, but promote to permanent storage when accessed repeatedly.
+Temporary memories provide a stage-based lifecycle for memories that may not need permanent storage. They automatically expire if unused, but promote to permanent storage when accessed repeatedly. A dedicated review interface makes it easy to rescue important memories before they expire.
 
-### Lifecycle
+### Lifecycle Stages
 
-1. **Creation**: Create a memory with `temporary: true` - stored in KV with 14-day TTL
-2. **First Access**: TTL extends to 28 days, extension_count increments to 1
-3. **Second Access**: TTL extends to 28 days, extension_count increments to 2
-4. **Third Access**: Memory is automatically promoted to permanent (D1 database)
+Temporary memories progress through two stages with increasing TTL and access thresholds:
+
+**Stage 1 (14-day TTL):**
+- Initial stage when memory is created with `temporary: true`
+- TTL: 14 days from last access
+- Advancement threshold: 5 accesses
+- Upon reaching 5 accesses, automatically advances to Stage 2
+
+**Stage 2 (28-day TTL):**
+- Extended stage after reaching 5 accesses
+- TTL: 28 days from last access
+- Auto-promotion threshold: 15 total accesses
+- Upon reaching 15 total accesses, automatically promotes to permanent storage
+
+### Lifecycle Metadata
+
+Each temporary memory tracks:
+- **access_count** - Total number of times the memory has been accessed
+- **stage** - Current stage (1 or 2)
+- **last_accessed** - Timestamp of most recent access
+- **days_until_expiry** - Calculated based on TTL and last access time
 
 ### Key Behaviors
 
@@ -277,7 +294,7 @@ https://your-worker-subdomain.your-subdomain.workers.dev/mcp
 
 ### Available MCP Tools
 
-The server exposes 8 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
+The server exposes 9 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
 
 #### Core Memory Tools
 
@@ -354,6 +371,17 @@ Returns formatted search results with matching memories, search criteria summary
 }
 ```
 
+**`review_temporary_memories`** - Review temporary memories with lifecycle status
+
+```json
+{
+  "limit": 50,
+  "offset": 0
+}
+```
+
+*Lists all temporary memories with their complete lifecycle metadata. Shows access count, current stage, last accessed time, and days until expiry. Perfect for reviewing and rescuing important memories before they expire. Includes pagination support.*
+
 **`promote_memory`** - Promote temporary memory to permanent
 
 ```json
@@ -362,7 +390,7 @@ Returns formatted search results with matching memories, search criteria summary
 }
 ```
 
-*Immediately promotes a temporary memory to permanent storage. Returns an error if the memory is already permanent or does not exist.*
+*Immediately promotes a temporary memory to permanent storage without waiting for the auto-promotion threshold. Returns an error if the memory is already permanent or does not exist.*
 
 ### MCP Resources
 
@@ -586,6 +614,7 @@ curl http://localhost:8787/api/memories \
 - `PUT /api/memories/{id}` - Update memory (supports hierarchical tags)
 - `DELETE /api/memories/{id}` - Delete memory
 - `POST /api/memories/{id}/promote` - Promote temporary memory to permanent
+- `GET /api/memories/temporary` - List temporary memories with lifecycle metadata (access count, stage, last accessed, days until expiry)
 - `GET /api/memories/stats` - Get memory statistics
 - `GET /api/memories/search` - Search memories
 

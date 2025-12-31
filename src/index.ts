@@ -134,6 +134,7 @@ app.post('/api/memories', memoryHandlers.createMemory);
 app.get('/api/memories', memoryHandlers.listMemories);
 app.get('/api/memories/stats', memoryHandlers.getMemoryStats);
 app.get('/api/memories/search', memoryHandlers.findMemories);
+app.get('/api/memories/temporary', memoryHandlers.listTemporaryMemories);
 app.get('/api/memories/:id', memoryHandlers.getMemory);
 app.put('/api/memories/:id', memoryHandlers.updateMemory);
 app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
@@ -178,7 +179,8 @@ app.get('/mcp/health', (c) => {
       'find_memories',
       'add_tags',
       'update_url_content',
-      'promote_memory'
+      'promote_memory',
+      'review_temporary_memories'
     ]
   });
 });

@@ -128,9 +128,27 @@ export interface TagTreeResponse {
   tree: TagTreeNode[];
 }
 
-// Temporary memory stored in KV with TTL tracking
+// Temporary memory stored in KV with stage-based lifecycle
 export interface TemporaryMemory extends Memory {
-  extension_count: number;
+  access_count: number;
+  stage: 1 | 2;
+  last_accessed: number;
+}
+
+// Type for review endpoint response with lifecycle metadata visible
+export interface TemporaryMemoryWithMetadata {
+  id: string;
+  name: string;
+  content: string;
+  url?: string;
+  tags: string[];
+  created_at: number;
+  updated_at: number;
+  // Lifecycle metadata (visible in review interface only)
+  access_count: number;
+  stage: 1 | 2;
+  last_accessed: number;
+  days_until_expiry: number;
 }
 
 // Rate limiting interface

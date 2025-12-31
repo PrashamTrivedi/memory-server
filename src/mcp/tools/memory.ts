@@ -10,7 +10,8 @@ import {
   formatMemoryAsMarkdown,
   formatMemoryListAsMarkdown,
   formatSuccessResponse,
-  createDualFormatResponse
+  createDualFormatResponse,
+  formatTemporaryMemoriesAsMarkdown
 } from '../utils/formatters.js';
 
 // Tool type definition
@@ -678,5 +679,67 @@ export async function handlePromoteMemory(env: Env, args: any): Promise<any> {
 
   } catch (error) {
     throw new Error(`Failed to promote memory: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * MCP Tool: Review Temporary Memories
+ * Lists temporary memories with lifecycle metadata for review and maintenance
+ */
+export const reviewTemporaryMemoriesTool: Tool = {
+  name: 'review_temporary_memories',
+  description: 'List temporary memories with their lifecycle metadata for review and maintenance. Shows days until expiry, access count, stage, and last accessed time.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      limit: {
+        type: 'number',
+        description: 'Maximum number of memories to return (max 100)',
+        default: 50,
+        minimum: 1,
+        maximum: 100,
+      },
+      offset: {
+        type: 'number',
+        description: 'Number of memories to skip for pagination',
+        default: 0,
+        minimum: 0,
+      },
+    },
+  },
+};
+
+export async function handleReviewTemporaryMemories(env: Env, args: any): Promise<any> {
+  try {
+    const limit = Math.min(args.limit || 50, 100);
+    const offset = args.offset || 0;
+
+    // Get temporary memories with full metadata
+    const allTemp = await TemporaryMemoryService.listAllWithMetadata(env);
+
+    const total = allTemp.length;
+    const paginated = allTemp.slice(offset, offset + limit);
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format as markdown with lifecycle metadata visible
+    const markdown = formatTemporaryMemoriesAsMarkdown(paginated, pagination);
+    const structuredData = {
+      success: true,
+      data: {
+        memories: paginated,
+        pagination
+      }
+    };
+
+    return createDualFormatResponse(markdown, structuredData);
+
+  } catch (error) {
+    throw new Error(`Failed to review temporary memories: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

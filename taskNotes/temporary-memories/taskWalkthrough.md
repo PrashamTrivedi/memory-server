@@ -1,162 +1,168 @@
-# Temporary Memories Feature - Verification Walkthrough
+# Task Walkthrough: Temporary Memories V2 with Review & Rescue
 
 ## Overview
 
-This walkthrough guides Product Owners through verifying the Temporary Memories feature implementation.
+This task upgraded the temporary memories system from a simple 3-access extension model to a sophisticated 2-stage lifecycle with a dedicated review interface.
 
-## Prerequisites
+## What Changed
 
-1. Create the KV namespace in Cloudflare:
-   ```bash
-   wrangler kv namespace create "TEMP_MEMORIES_KV"
-   ```
+### Before (V1)
+- `extension_count` tracked 0→1→2→promote
+- 3 accesses to become permanent
+- No way to review temporary memories separately
 
-2. Update `wrangler.jsonc` with the actual KV namespace ID
+### After (V2)
+- Stage-based lifecycle: Stage 1 (14-day TTL) → Stage 2 (28-day TTL) → Permanent
+- 5 accesses to advance to Stage 2
+- 15 total accesses to auto-promote
+- Dedicated review interface showing lifecycle metadata
 
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
+---
 
-## Verification Steps
+## Verification Steps for Product Owners
 
-### Step 1: Create a Temporary Memory
+### 1. Create a Temporary Memory
 
 **REST API:**
 ```bash
 curl -X POST http://localhost:8787/api/memories \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "name": "Test Temporary Memory",
-    "content": "This is a test temporary memory",
-    "tags": ["test", "temporary"],
-    "temporary": true
-  }'
+  -H "Authorization: Bearer <token>" \
+  -d '{"name": "Test Temp Memory", "content": "Testing lifecycle", "temporary": true}'
 ```
-
-**Expected:** Returns memory object with ID. No indication of temporary status in response.
 
 **MCP Tool:**
 ```json
 {
-  "name": "add_memory",
+  "tool": "add_memory",
   "arguments": {
-    "name": "Test Temporary Memory",
-    "content": "This is a test temporary memory",
-    "tags": ["test"],
+    "name": "Test Temp Memory",
+    "content": "Testing lifecycle",
     "temporary": true
   }
 }
 ```
 
-### Step 2: Verify Memory Appears in Listings
+**Expected:** Memory created with Stage 1, 14-day TTL, access_count=0
 
+---
+
+### 2. Verify First-Class Citizenship
+
+**List all memories:**
 ```bash
 curl http://localhost:8787/api/memories \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer <token>"
 ```
 
-**Expected:** The temporary memory appears in the list alongside permanent memories.
+**Expected:** Temporary memory appears alongside permanent memories WITHOUT showing lifecycle metadata (access_count, stage, etc.)
 
-### Step 3: Access Memory to Extend TTL
+---
 
+### 3. Review Temporary Memories (New Feature)
+
+**REST API:**
 ```bash
-curl http://localhost:8787/api/memories/{memory_id} \
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl http://localhost:8787/api/memories/temporary \
+  -H "Authorization: Bearer <token>"
 ```
 
-**Expected:** Memory is returned. Internally, TTL is extended to 28 days and extension_count increments.
-
-### Step 4: Search for Temporary Memory
-
-```bash
-curl "http://localhost:8787/api/memories/search?query=temporary" \
-  -H "Authorization: Bearer YOUR_API_KEY"
+**MCP Tool:**
+```json
+{
+  "tool": "review_temporary_memories",
+  "arguments": {}
+}
 ```
 
-**Expected:** Temporary memory appears in search results.
+**Expected Response includes:**
+- `access_count`: 0
+- `stage`: 1
+- `days_until_expiry`: ~14
+- `last_accessed`: timestamp
+- Urgency indicator (green for safe, yellow for soon, red for urgent)
 
-### Step 5: Manual Promotion
+---
 
+### 4. Test Stage Advancement
+
+Access the memory 5 times:
 ```bash
-curl -X POST http://localhost:8787/api/memories/{memory_id}/promote \
-  -H "Authorization: Bearer YOUR_API_KEY"
+for i in {1..5}; do
+  curl http://localhost:8787/api/memories/<id> \
+    -H "Authorization: Bearer <token>"
+  sleep 1
+done
+```
+
+**Expected after 5 accesses:**
+- `stage`: 2
+- `access_count`: 5
+- `days_until_expiry`: ~28 (TTL extended)
+
+---
+
+### 5. Test Auto-Promotion
+
+Access the memory 10 more times (total 15):
+```bash
+for i in {1..10}; do
+  curl http://localhost:8787/api/memories/<id> \
+    -H "Authorization: Bearer <token>"
+  sleep 1
+done
 ```
 
 **Expected:**
-- Success response with `promoted: true`
-- Memory is now permanent (stored in D1)
+- Memory automatically promoted to permanent (D1 database)
+- No longer appears in `GET /api/memories/temporary`
+- Still appears in `GET /api/memories` (now permanent)
+
+---
+
+### 6. Test Manual Promotion (Rescue)
+
+Create another temporary memory, then promote it manually:
+
+**REST API:**
+```bash
+curl -X POST http://localhost:8787/api/memories/<id>/promote \
+  -H "Authorization: Bearer <token>"
+```
 
 **MCP Tool:**
 ```json
 {
-  "name": "promote_memory",
-  "arguments": {
-    "id": "{memory_id}"
-  }
+  "tool": "promote_memory",
+  "arguments": {"id": "<memory-id>"}
 }
 ```
 
-### Step 6: Verify Promotion Error for Permanent Memory
+**Expected:** Memory immediately becomes permanent regardless of access count
 
-```bash
-curl -X POST http://localhost:8787/api/memories/{same_memory_id}/promote \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+---
 
-**Expected:** Error response: "Memory is already permanent"
+## Key Files Modified
 
-### Step 7: Delete Temporary Memory
+| File | Change |
+|------|--------|
+| `types/index.ts` | New `TemporaryMemoryWithMetadata` type, updated `TemporaryMemory` |
+| `src/services/temporaryMemory.ts` | Stage-based lifecycle, `listAllWithMetadata()` |
+| `src/handlers/memory.ts` | `listTemporaryMemories` handler |
+| `src/index.ts` | `/api/memories/temporary` route |
+| `src/mcp/tools/memory.ts` | `review_temporary_memories` tool |
+| `src/mcp/server.ts` | Tool registration |
+| `src/mcp/utils/formatters.ts` | `formatTemporaryMemoriesAsMarkdown` |
 
-Create another temporary memory, then delete it:
+---
 
-```bash
-curl -X DELETE http://localhost:8787/api/memories/{temp_memory_id} \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+## Acceptance Criteria Checklist
 
-**Expected:** Memory is deleted successfully.
-
-## Lifecycle Verification (Advanced)
-
-To verify the full lifecycle (14-day → 28-day → auto-promote), you would need to:
-
-1. Create a temporary memory
-2. Check KV directly: `wrangler kv key get --namespace-id={id} "temp_memory:{memory_id}"`
-3. Observe `extension_count: 0` and 14-day TTL
-4. Access the memory 3 times
-5. Verify on 3rd access, memory moves from KV to D1
-
-## Key Behaviors to Verify
-
-| Behavior | Verification Method |
-|----------|---------------------|
-| Temporary memories hidden from API | Response never includes `extension_count` or `temporary` status |
-| TTL extends on access | Check KV directly after access |
-| Auto-promotion after 3 accesses | Memory moves from KV to D1 |
-| Manual promotion | POST `/api/memories/{id}/promote` works |
-| List merges both stores | Temporary and permanent memories appear together |
-| Search works across both | FTS and tag search find both |
-| Delete works for both | DELETE removes from correct store |
-
-## Files Changed
-
-| File | Description |
-|------|-------------|
-| `types/index.ts` | Added `temporary` flag and `TemporaryMemory` type |
-| `src/services/temporaryMemory.ts` | NEW - Core TTL lifecycle logic |
-| `src/handlers/memory.ts` | Updated create, get, list, find, delete + promoteMemory |
-| `src/index.ts` | Added `/api/memories/:id/promote` route |
-| `src/mcp/tools/memory.ts` | Updated MCP tools + promote_memory |
-| `src/mcp/tools/search.ts` | Updated find_memories to merge KV results |
-| `src/mcp/server.ts` | Registered promote_memory tool |
-| `wrangler.jsonc` | Added TEMP_MEMORIES_KV namespace |
-| `README.md` | Added feature documentation |
-
-## Next Steps
-
-1. Test in staging environment
-2. Create KV namespace in production
-3. Deploy to production
-4. Monitor KV usage and memory promotion patterns
+- [x] Stage 1: 14-day TTL, 5 accesses to advance
+- [x] Stage 2: 28-day TTL, 15 total accesses to promote
+- [x] Temporary memories hidden in normal list/search (first-class citizen)
+- [x] Review endpoint shows lifecycle metadata
+- [x] Sorted by urgency (most urgent first)
+- [x] Manual promotion still works
+- [x] MCP tool for review interface
+- [x] Documentation updated

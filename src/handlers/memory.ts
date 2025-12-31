@@ -17,7 +17,8 @@ import {
   formatSearchResultsAsMarkdown,
   formatSuccessResponse,
   formatStatsAsMarkdown,
-  formatErrorResponse
+  formatErrorResponse,
+  formatTemporaryMemoriesAsMarkdown
 } from '../mcp/utils/formatters';
 
 /**
@@ -512,6 +513,45 @@ export async function promoteMemory(c: Context<{ Bindings: Env }>) {
     const jsonData = {
       success: true,
       data: { promoted: true, id, memory }
+    };
+
+    return sendFormattedResponse(c, markdown, jsonData);
+
+  } catch (error) {
+    return handleMemoryError(error, c);
+  }
+}
+
+/**
+ * List temporary memories with lifecycle metadata
+ * GET /api/memories/temporary
+ */
+export async function listTemporaryMemories(c: Context<{ Bindings: Env }>) {
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') || '50'), 100);
+    const offset = parseInt(c.req.query('offset') || '0');
+
+    // Get temporary memories with full metadata
+    const allTemp = await TemporaryMemoryService.listAllWithMetadata(c.env);
+
+    const total = allTemp.length;
+    const paginated = allTemp.slice(offset, offset + limit);
+
+    const pagination = {
+      total,
+      limit,
+      offset,
+      has_more: offset + limit < total
+    };
+
+    // Format response with lifecycle metadata visible
+    const markdown = formatTemporaryMemoriesAsMarkdown(paginated, pagination);
+    const jsonData = {
+      success: true,
+      data: {
+        memories: paginated,
+        pagination
+      }
     };
 
     return sendFormattedResponse(c, markdown, jsonData);

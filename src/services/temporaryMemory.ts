@@ -1,17 +1,24 @@
-import type { Env, Memory, TemporaryMemory } from '../../types';
+import type { Env, Memory, TemporaryMemory, TemporaryMemoryWithMetadata } from '../../types';
 
-const TTL_14_DAYS = 14 * 24 * 60 * 60; // 1,209,600 seconds
-const TTL_28_DAYS = 28 * 24 * 60 * 60; // 2,419,200 seconds
+const TTL_14_DAYS = 14 * 24 * 60 * 60; // 1,209,600 seconds (Stage 1)
+const TTL_28_DAYS = 28 * 24 * 60 * 60; // 2,419,200 seconds (Stage 2)
 const TEMP_MEMORY_PREFIX = 'temp_memory:';
+
+// Lifecycle thresholds
+const STAGE_1_THRESHOLD = 5;  // Accesses needed to advance to Stage 2
+const STAGE_2_THRESHOLD = 15; // Total accesses needed for auto-promotion
 
 export class TemporaryMemoryService {
   /**
    * Create a new temporary memory in KV
    */
   static async create(env: Env, memory: Memory): Promise<TemporaryMemory> {
+    const now = Math.floor(Date.now() / 1000);
     const tempMemory: TemporaryMemory = {
       ...memory,
-      extension_count: 0,
+      access_count: 0,
+      stage: 1,
+      last_accessed: now,
     };
 
     await env.TEMP_MEMORIES_KV.put(
@@ -34,7 +41,7 @@ export class TemporaryMemoryService {
   }
 
   /**
-   * Handle memory access - extend TTL or promote to permanent
+   * Handle memory access - increment access count, advance stage, or promote to permanent
    * Returns { promoted: boolean, memory: Memory | null }
    */
   static async handleAccess(
@@ -46,26 +53,41 @@ export class TemporaryMemoryService {
       return { promoted: false, memory: null };
     }
 
-    if (tempMemory.extension_count >= 2) {
-      // Promote to permanent
+    const now = Math.floor(Date.now() / 1000);
+    const newAccessCount = tempMemory.access_count + 1;
+
+    // Check for auto-promotion (stage 2 with 15+ accesses)
+    if (tempMemory.stage === 2 && newAccessCount >= STAGE_2_THRESHOLD) {
       const promoted = await this.promote(env, id);
       return { promoted: true, memory: promoted };
     }
 
-    // Extend TTL and increment counter
+    // Check for stage advancement (stage 1 with 5+ accesses)
+    let newStage: 1 | 2 = tempMemory.stage;
+    let newTtl = tempMemory.stage === 1 ? TTL_14_DAYS : TTL_28_DAYS;
+
+    if (tempMemory.stage === 1 && newAccessCount >= STAGE_1_THRESHOLD) {
+      newStage = 2;
+      newTtl = TTL_28_DAYS;
+    }
+
+    // Update with new access info
     const updated: TemporaryMemory = {
       ...tempMemory,
-      extension_count: tempMemory.extension_count + 1,
-      updated_at: Math.floor(Date.now() / 1000),
+      access_count: newAccessCount,
+      stage: newStage,
+      last_accessed: now,
+      updated_at: now,
     };
 
     await env.TEMP_MEMORIES_KV.put(
       `${TEMP_MEMORY_PREFIX}${id}`,
       JSON.stringify(updated),
-      { expirationTtl: TTL_28_DAYS }
+      { expirationTtl: newTtl }
     );
 
-    const { extension_count, ...memory } = updated;
+    // Return memory without lifecycle metadata
+    const { access_count, stage, last_accessed, ...memory } = updated;
     return { promoted: false, memory };
   }
 
@@ -76,7 +98,7 @@ export class TemporaryMemoryService {
     const tempMemory = await this.get(env, id);
     if (!tempMemory) return null;
 
-    const { extension_count, ...memory } = tempMemory;
+    const { access_count, stage, last_accessed, ...memory } = tempMemory;
     const now = Math.floor(Date.now() / 1000);
 
     // Insert into D1
@@ -128,6 +150,7 @@ export class TemporaryMemoryService {
 
   /**
    * List all temporary memories (for merging with D1 results)
+   * Returns memories WITHOUT lifecycle metadata
    */
   static async listAll(env: Env): Promise<Memory[]> {
     const list = await env.TEMP_MEMORIES_KV.list({ prefix: TEMP_MEMORY_PREFIX });
@@ -137,12 +160,52 @@ export class TemporaryMemoryService {
       const data = await env.TEMP_MEMORIES_KV.get(key.name);
       if (data) {
         const tempMemory: TemporaryMemory = JSON.parse(data);
-        const { extension_count, ...memory } = tempMemory;
+        const { access_count, stage, last_accessed, ...memory } = tempMemory;
         memories.push(memory);
       }
     }
 
     return memories;
+  }
+
+  /**
+   * List all temporary memories WITH lifecycle metadata (for review endpoint)
+   * Sorted by days_until_expiry ascending (most urgent first)
+   */
+  static async listAllWithMetadata(env: Env): Promise<TemporaryMemoryWithMetadata[]> {
+    const list = await env.TEMP_MEMORIES_KV.list({ prefix: TEMP_MEMORY_PREFIX });
+    const memories: TemporaryMemoryWithMetadata[] = [];
+
+    for (const key of list.keys) {
+      const data = await env.TEMP_MEMORIES_KV.get(key.name);
+      if (data) {
+        const tempMemory: TemporaryMemory = JSON.parse(data);
+
+        // Calculate days until expiry based on stage TTL and last_accessed
+        const ttlSeconds = tempMemory.stage === 1 ? TTL_14_DAYS : TTL_28_DAYS;
+        const expiresAt = tempMemory.last_accessed + ttlSeconds;
+        const now = Math.floor(Date.now() / 1000);
+        const secondsUntilExpiry = Math.max(0, expiresAt - now);
+        const daysUntilExpiry = Math.ceil(secondsUntilExpiry / (24 * 60 * 60));
+
+        memories.push({
+          id: tempMemory.id,
+          name: tempMemory.name,
+          content: tempMemory.content,
+          url: tempMemory.url,
+          tags: tempMemory.tags,
+          created_at: tempMemory.created_at,
+          updated_at: tempMemory.updated_at,
+          access_count: tempMemory.access_count,
+          stage: tempMemory.stage,
+          last_accessed: tempMemory.last_accessed,
+          days_until_expiry: daysUntilExpiry,
+        });
+      }
+    }
+
+    // Sort by days_until_expiry ascending (most urgent first)
+    return memories.sort((a, b) => a.days_until_expiry - b.days_until_expiry);
   }
 
   /**
@@ -164,7 +227,7 @@ export class TemporaryMemoryService {
   }
 
   /**
-   * Update a temporary memory (preserves TTL based on extension count)
+   * Update a temporary memory (preserves TTL based on stage)
    */
   static async update(
     env: Env,
@@ -182,8 +245,8 @@ export class TemporaryMemoryService {
       updated_at: now,
     };
 
-    // Determine TTL based on extension count
-    const ttl = tempMemory.extension_count === 0 ? TTL_14_DAYS : TTL_28_DAYS;
+    // Determine TTL based on stage
+    const ttl = tempMemory.stage === 1 ? TTL_14_DAYS : TTL_28_DAYS;
 
     await env.TEMP_MEMORIES_KV.put(
       `${TEMP_MEMORY_PREFIX}${id}`,
@@ -191,7 +254,7 @@ export class TemporaryMemoryService {
       { expirationTtl: ttl }
     );
 
-    const { extension_count, ...memory } = updated;
+    const { access_count, stage, last_accessed, ...memory } = updated;
     return memory;
   }
 
