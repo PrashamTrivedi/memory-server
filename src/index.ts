@@ -137,6 +137,7 @@ app.get('/api/memories/search', memoryHandlers.findMemories);
 app.get('/api/memories/:id', memoryHandlers.getMemory);
 app.put('/api/memories/:id', memoryHandlers.updateMemory);
 app.delete('/api/memories/:id', memoryHandlers.deleteMemory);
+app.post('/api/memories/:id/promote', memoryHandlers.promoteMemory);
 
 // API Key Management endpoints
 // Note: These require authentication (same level as other API routes)
@@ -171,12 +172,13 @@ app.get('/mcp/health', (c) => {
     capabilities: ['tools', 'resources', 'prompts'],
     tools: [
       'add_memory',
-      'get_memory', 
+      'get_memory',
       'list_memories',
       'delete_memory',
       'find_memories',
       'add_tags',
-      'update_url_content'
+      'update_url_content',
+      'promote_memory'
     ]
   });
 });

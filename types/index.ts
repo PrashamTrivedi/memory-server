@@ -14,6 +14,7 @@ export interface CreateMemoryRequest {
   content: string;
   url?: string;
   tags?: string[];
+  temporary?: boolean;
 }
 
 export interface UpdateMemoryRequest {
@@ -127,6 +128,11 @@ export interface TagTreeResponse {
   tree: TagTreeNode[];
 }
 
+// Temporary memory stored in KV with TTL tracking
+export interface TemporaryMemory extends Memory {
+  extension_count: number;
+}
+
 // Rate limiting interface
 export interface RateLimit {
   limit(options: { key: string }): Promise<{
@@ -138,6 +144,7 @@ export interface RateLimit {
 export interface Env {
   DB: D1Database;
   CACHE_KV: KVNamespace;
+  TEMP_MEMORIES_KV: KVNamespace;
   BROWSER: Fetcher;
   ENVIRONMENT: string;
 

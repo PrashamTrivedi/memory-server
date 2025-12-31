@@ -11,6 +11,7 @@ import {
   handleListMemories,
   handleDeleteMemory,
   handleUpdateUrlContent,
+  handlePromoteMemory,
 } from './tools/memory.js'
 
 import {
@@ -49,6 +50,7 @@ export function createMCPMemoryServer(env: Env): McpServer {
       content: z.string().describe('Content of the memory'),
       url: z.string().optional().describe('Optional URL to fetch content from'),
       tags: z.array(z.string()).optional().describe('Optional tags to associate with the memory'),
+      temporary: z.boolean().optional().describe('Create as temporary memory with TTL (auto-expires if not accessed, promotes to permanent after repeated access)'),
     },
     async (args) => {
       return await handleAddMemory(env, args)
@@ -124,6 +126,17 @@ export function createMCPMemoryServer(env: Env): McpServer {
     },
     async (args) => {
       return await handleAddTags(env, args)
+    }
+  )
+
+  server.tool(
+    'promote_memory',
+    'Promote a temporary memory to permanent status',
+    {
+      id: z.string().describe('Memory ID to promote'),
+    },
+    async (args) => {
+      return await handlePromoteMemory(env, args)
     }
   )
 

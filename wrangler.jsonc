@@ -44,6 +44,10 @@
     {
       "binding": "CACHE_KV",
       "id": "32ccd77eecf84aa08f3ded49aeb8ca69"
+    },
+    {
+      "binding": "TEMP_MEMORIES_KV",
+      "id": "temp-memories-kv-id-placeholder"
     }
   ],
   // Environment variables

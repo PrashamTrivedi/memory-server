@@ -5,6 +5,7 @@ import {
   CreateMemoryRequest
 } from '../../../types/index';
 import { TagHierarchyService } from '../../services/tagHierarchy';
+import { TemporaryMemoryService } from '../../services/temporaryMemory';
 import {
   formatMemoryAsMarkdown,
   formatMemoryListAsMarkdown,
@@ -47,6 +48,10 @@ export const addMemoryTool: Tool = {
         items: { type: 'string' },
         description: 'Optional tags to associate with the memory. Supports hierarchical format like "parent>child"',
       },
+      temporary: {
+        type: 'boolean',
+        description: 'Create as temporary memory with TTL (auto-expires if not accessed, promotes to permanent after repeated access)',
+      },
     },
     required: ['name', 'content'],
   },
@@ -59,6 +64,7 @@ export async function handleAddMemory(env: Env, args: any): Promise<any> {
       content: args.content,
       url: args.url,
       tags: args.tags || [],
+      temporary: args.temporary,
     };
 
     // Validate required fields
@@ -69,7 +75,7 @@ export async function handleAddMemory(env: Env, args: any): Promise<any> {
     // Generate UUID for new memory
     const id = uuidv4();
     const now = Math.floor(Date.now() / 1000);
-    
+
     // Handle URL content fetching if URL provided
     let content = request.content;
     if (request.url) {
@@ -79,24 +85,42 @@ export async function handleAddMemory(env: Env, args: any): Promise<any> {
       }
     }
 
-    // Insert memory into database
-    const stmt = env.DB.prepare(`
-      INSERT INTO memories (id, name, content, url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    
-    await stmt.bind(id, request.name, content, request.url || null, now, now).run();
+    let memory: Memory;
 
-    // Handle tags if provided
-    if (request.tags && request.tags.length > 0) {
-      await assignTagsToMemory(env.DB, id, request.tags);
+    if (request.temporary) {
+      // Create temporary memory in KV
+      const tempMemory: Memory = {
+        id,
+        name: request.name,
+        content,
+        url: request.url,
+        tags: request.tags || [],
+        created_at: now,
+        updated_at: now,
+      };
+      await TemporaryMemoryService.create(env, tempMemory);
+      memory = tempMemory;
+    } else {
+      // Insert permanent memory into database
+      const stmt = env.DB.prepare(`
+        INSERT INTO memories (id, name, content, url, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      await stmt.bind(id, request.name, content, request.url || null, now, now).run();
+
+      // Handle tags if provided
+      if (request.tags && request.tags.length > 0) {
+        await assignTagsToMemory(env.DB, id, request.tags);
+      }
+
+      // Fetch the created memory with tags
+      const createdMemory = await getMemoryById(env.DB, id);
+      memory = createdMemory!;
     }
 
-    // Fetch the created memory with tags
-    const memory = await getMemoryById(env.DB, id);
-
     // Format as markdown
-    const markdown = formatMemoryAsMarkdown(memory!);
+    const markdown = formatMemoryAsMarkdown(memory);
     const structuredData = {
       success: true,
       data: memory,
@@ -131,13 +155,26 @@ export const getMemoryTool: Tool = {
 export async function handleGetMemory(env: Env, args: any): Promise<any> {
   try {
     const id = args.id;
-    
+
     if (!id) {
       throw new Error('Memory ID is required');
     }
 
+    // First check temporary memories in KV (also handles TTL extension/promotion)
+    const tempResult = await TemporaryMemoryService.handleAccess(env, id);
+    if (tempResult.memory) {
+      // Format as markdown
+      const markdown = formatMemoryAsMarkdown(tempResult.memory);
+      const structuredData = {
+        success: true,
+        data: tempResult.memory,
+      };
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Fall back to D1 (permanent memories)
     const memory = await getMemoryById(env.DB, id);
-    
+
     if (!memory) {
       throw new Error(`Memory with ID ${id} not found`);
     }
@@ -202,26 +239,21 @@ export async function handleListMemories(env: Env, args: any): Promise<any> {
   try {
     const limit = Math.min(args.limit || 10, 100);
     const offset = args.offset || 0;
-    
-    // Get memories with pagination
+
+    // Get permanent memories from D1
     const stmt = env.DB.prepare(`
       SELECT id, name, content, url, created_at, updated_at
       FROM memories
       ORDER BY updated_at DESC, created_at DESC
-      LIMIT ? OFFSET ?
     `);
-    
-    const result = await stmt.bind(limit, offset).all<any>();
-    
-    // Get total count
-    const countResult = await env.DB.prepare('SELECT COUNT(*) as count FROM memories').first<{ count: number }>();
-    const total = countResult?.count || 0;
-    
-    // Enrich memories with tags
-    const memories: Memory[] = [];
+
+    const result = await stmt.all<any>();
+
+    // Enrich D1 memories with tags
+    const d1Memories: Memory[] = [];
     for (const row of result.results || []) {
       const tags = await getMemoryTags(env.DB, row.id);
-      memories.push({
+      d1Memories.push({
         id: row.id,
         name: row.name,
         content: row.content,
@@ -232,6 +264,19 @@ export async function handleListMemories(env: Env, args: any): Promise<any> {
       });
     }
 
+    // Get temporary memories from KV
+    const tempMemories = await TemporaryMemoryService.listAll(env);
+
+    // Merge and sort by updated_at desc
+    const allMemories = [...d1Memories, ...tempMemories].sort(
+      (a, b) => b.updated_at - a.updated_at
+    );
+
+    const total = allMemories.length;
+
+    // Apply pagination
+    const paginated = allMemories.slice(offset, offset + limit);
+
     const pagination = {
       total,
       limit,
@@ -240,11 +285,11 @@ export async function handleListMemories(env: Env, args: any): Promise<any> {
     };
 
     // Format as markdown
-    const markdown = formatMemoryListAsMarkdown(memories, pagination);
+    const markdown = formatMemoryListAsMarkdown(paginated, pagination);
     const structuredData = {
       success: true,
       data: {
-        memories,
+        memories: paginated,
         pagination
       }
     };
@@ -278,12 +323,26 @@ export const deleteMemoryTool: Tool = {
 export async function handleDeleteMemory(env: Env, args: any): Promise<any> {
   try {
     const id = args.id;
-    
+
     if (!id) {
       throw new Error('Memory ID is required');
     }
 
-    // Verify memory exists
+    // Try to delete from temporary memories first
+    const deletedTemp = await TemporaryMemoryService.delete(env, id);
+    if (deletedTemp) {
+      const markdown = formatSuccessResponse(
+        `Memory has been deleted successfully.`,
+        { id }
+      );
+      const structuredData = {
+        success: true,
+        data: { deleted: true, id }
+      };
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Fall back to D1 - verify memory exists
     const memory = await getMemoryById(env.DB, id);
     if (!memory) {
       throw new Error(`Memory with ID ${id} not found`);
@@ -554,12 +613,70 @@ async function linkTagToMemory(db: D1Database, memoryId: string, tagId: number):
 async function getOrCreateTag(db: D1Database, tagName: string): Promise<number> {
   // Try to get existing tag
   const existing = await db.prepare('SELECT id FROM tags WHERE name = ?').bind(tagName).first<{ id: number }>();
-  
+
   if (existing) {
     return existing.id;
   }
-  
+
   // Create new tag
   const result = await db.prepare('INSERT INTO tags (name) VALUES (?)').bind(tagName).run();
   return result.meta.last_row_id as number;
+}
+
+/**
+ * MCP Tool: Promote Memory
+ * Promotes a temporary memory to permanent status
+ */
+export const promoteMemoryTool: Tool = {
+  name: 'promote_memory',
+  description: 'Promote a temporary memory to permanent status',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The UUID of the temporary memory to promote',
+      },
+    },
+    required: ['id'],
+  },
+};
+
+export async function handlePromoteMemory(env: Env, args: any): Promise<any> {
+  try {
+    const id = args.id;
+
+    if (!id) {
+      throw new Error('Memory ID is required');
+    }
+
+    // Check if exists as temporary
+    const exists = await TemporaryMemoryService.exists(env, id);
+    if (!exists) {
+      // Check if already permanent
+      const permanent = await getMemoryById(env.DB, id);
+      if (permanent) {
+        throw new Error('Memory is already permanent');
+      }
+      throw new Error(`Memory with ID ${id} not found`);
+    }
+
+    // Promote the memory
+    const memory = await TemporaryMemoryService.promote(env, id);
+
+    // Format as markdown
+    const markdown = formatSuccessResponse(
+      `Memory "${memory?.name}" has been promoted to permanent status.`,
+      { id, name: memory?.name }
+    );
+    const structuredData = {
+      success: true,
+      data: { promoted: true, id, memory }
+    };
+
+    return createDualFormatResponse(markdown, structuredData);
+
+  } catch (error) {
+    throw new Error(`Failed to promote memory: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
