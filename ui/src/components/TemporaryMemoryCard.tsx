@@ -9,6 +9,12 @@ interface TemporaryMemoryCardProps {
 }
 
 export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }: TemporaryMemoryCardProps) {
+  // Defensive defaults for missing lifecycle data
+  const accessCount = memory.access_count ?? 0;
+  const stage = memory.stage ?? 1;
+  const daysUntilExpiry = memory.days_until_expiry ?? 14;
+  const lastAccessed = memory.last_accessed ?? memory.updated_at ?? Date.now() / 1000;
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -32,29 +38,29 @@ export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }:
   };
 
   const getUrgencyClass = () => {
-    if (memory.days_until_expiry <= 3) return 'urgent';
-    if (memory.days_until_expiry <= 7) return 'soon';
+    if (daysUntilExpiry <= 3) return 'urgent';
+    if (daysUntilExpiry <= 7) return 'soon';
     return 'safe';
   };
 
   const getUrgencyLabel = () => {
-    if (memory.days_until_expiry <= 3) return 'URGENT';
-    if (memory.days_until_expiry <= 7) return 'Soon';
+    if (daysUntilExpiry <= 3) return 'URGENT';
+    if (daysUntilExpiry <= 7) return 'Soon';
     return 'Safe';
   };
 
   const getProgressPercent = () => {
-    if (memory.stage === 1) {
-      return Math.min((memory.access_count / 5) * 100, 100);
+    if (stage === 1) {
+      return Math.min((accessCount / 5) * 100, 100);
     }
-    return Math.min((memory.access_count / 15) * 100, 100);
+    return Math.min((accessCount / 15) * 100, 100);
   };
 
   const getProgressLabel = () => {
-    if (memory.stage === 1) {
-      return `${memory.access_count}/5 to Stage 2`;
+    if (stage === 1) {
+      return `${accessCount}/5 to Stage 2`;
     }
-    return `${memory.access_count}/15 to Permanent`;
+    return `${accessCount}/15 to Permanent`;
   };
 
   return (
@@ -92,11 +98,11 @@ export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }:
 
       <div className="temp-memory-lifecycle">
         <div className="lifecycle-badges">
-          <span className={`stage-badge stage-${memory.stage}`}>
-            Stage {memory.stage}
+          <span className={`stage-badge stage-${stage}`}>
+            Stage {stage}
           </span>
           <span className={`expiry-badge ${getUrgencyClass()}`}>
-            {memory.days_until_expiry}d left - {getUrgencyLabel()}
+            {daysUntilExpiry}d left - {getUrgencyLabel()}
           </span>
         </div>
 
@@ -130,10 +136,10 @@ export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }:
 
       <div className="temp-memory-card-footer">
         <span className="temp-memory-card-stat">
-          {memory.access_count} accesses
+          {accessCount} accesses
         </span>
         <span className="temp-memory-card-date">
-          Last accessed {formatDate(memory.last_accessed)}
+          Last accessed {formatDate(lastAccessed)}
         </span>
       </div>
     </div>

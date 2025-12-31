@@ -30,9 +30,9 @@ export function TemporaryMemoryReview() {
     setSelectedMemory(memory);
   };
 
-  const getUrgentCount = () => memories.filter(m => m.days_until_expiry <= 3).length;
-  const getSoonCount = () => memories.filter(m => m.days_until_expiry > 3 && m.days_until_expiry <= 7).length;
-  const getSafeCount = () => memories.filter(m => m.days_until_expiry > 7).length;
+  const getUrgentCount = () => memories.filter(m => (m.days_until_expiry ?? 14) <= 3).length;
+  const getSoonCount = () => memories.filter(m => (m.days_until_expiry ?? 14) > 3 && (m.days_until_expiry ?? 14) <= 7).length;
+  const getSafeCount = () => memories.filter(m => (m.days_until_expiry ?? 14) > 7).length;
 
   const renderHeader = () => (
     <div className="temp-review-header">
