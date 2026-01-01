@@ -49,7 +49,7 @@
     // Temporary memories storage (14-28 day TTL, auto-promotes after 3 accesses)
     {
       "binding": "TEMP_MEMORIES_KV",
-      "id": "temp-memories-kv-id-placeholder"
+      "id": "04721ad34777453f9ae3fcd1e6a0c4c8"
     }
   ],
   // Environment variables

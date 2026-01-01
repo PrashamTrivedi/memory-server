@@ -1,6 +1,7 @@
 import type { Env } from '../../index';
 import { Memory } from '../../../types/index';
 import { TemporaryMemoryService } from '../../services/temporaryMemory';
+import { TagHierarchyService } from '../../services/tagHierarchy';
 import {
   formatSearchResultsAsMarkdown,
   formatMemoryAsMarkdown,
@@ -119,11 +120,11 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
 
 /**
  * MCP Tool: Add Tags
- * Add tags to an existing memory
+ * Add tags to an existing memory (supports both permanent and temporary memories)
  */
 export const addTagsTool: Tool = {
   name: 'add_tags',
-  description: 'Add tags to an existing memory',
+  description: 'Add tags to an existing memory. Supports hierarchical tags in "parent>child" format.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -134,7 +135,7 @@ export const addTagsTool: Tool = {
       tags: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Tags to add to the memory',
+        description: 'Tags to add to the memory. Supports hierarchical format "parent>child"',
         minItems: 1,
       },
     },
@@ -144,9 +145,9 @@ export const addTagsTool: Tool = {
 
 export async function handleAddTags(env: Env, args: any): Promise<any> {
   try {
-    const memoryId = args.memory_id;
+    const memoryId = args.memory_id || args.memoryId; // Support both camelCase and snake_case
     const tags = args.tags;
-    
+
     if (!memoryId) {
       throw new Error('Memory ID is required');
     }
@@ -155,14 +156,61 @@ export async function handleAddTags(env: Env, args: any): Promise<any> {
       throw new Error('Tags array is required and must not be empty');
     }
 
-    // Verify memory exists
+    // Check if memory is temporary first
+    const isTemporary = await TemporaryMemoryService.exists(env, memoryId);
+
+    if (isTemporary) {
+      // Handle temporary memory
+      const tempMemory = await TemporaryMemoryService.get(env, memoryId);
+      if (!tempMemory) {
+        throw new Error(`Memory with ID ${memoryId} not found`);
+      }
+
+      // Process tags and merge with existing (upsert behavior)
+      const existingTags = new Set(tempMemory.tags || []);
+      const processedTags: string[] = [];
+
+      for (const tag of tags) {
+        if (!tag.trim()) continue;
+
+        if (tag.includes('>')) {
+          // Hierarchical tag - extract both parent and child
+          const parts = tag.split('>').map((p: string) => p.trim()).filter(Boolean);
+          if (parts.length === 2) {
+            const [parent, child] = parts;
+            processedTags.push(parent, child);
+          }
+        } else {
+          processedTags.push(tag.trim());
+        }
+      }
+
+      // Add new tags to existing (upsert - no duplicates)
+      for (const tag of processedTags) {
+        existingTags.add(tag);
+      }
+
+      // Update temporary memory with merged tags
+      const updatedTags = Array.from(existingTags);
+      const updated = await TemporaryMemoryService.update(env, memoryId, { tags: updatedTags });
+
+      const markdown = formatMemoryAsMarkdown(updated!);
+      const structuredData = {
+        success: true,
+        data: updated,
+      };
+
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Permanent memory in D1
     const memory = await getMemoryById(env.DB, memoryId);
     if (!memory) {
       throw new Error(`Memory with ID ${memoryId} not found`);
     }
 
-    // Add new tags to existing tags
-    await assignTagsToMemory(env.DB, memoryId, tags);
+    // Add new tags with hierarchical support
+    await assignTagsToMemoryWithHierarchy(env.DB, memoryId, tags);
 
     // Update memory timestamp
     await env.DB.prepare(`
@@ -385,37 +433,92 @@ async function getMemoryTags(db: D1Database, memoryId: string): Promise<string[]
   return result.results?.map(r => r.name) || [];
 }
 
-async function assignTagsToMemory(db: D1Database, memoryId: string, tagNames: string[]): Promise<void> {
-  for (const tagName of tagNames) {
-    if (!tagName.trim()) continue;
-    
-    // Get or create tag
-    let tagId = await getOrCreateTag(db, tagName.trim());
-    
-    // Link memory to tag
-    try {
-      await db.prepare(`
-        INSERT INTO memory_tags (memory_id, tag_id)
-        VALUES (?, ?)
-      `).bind(memoryId, tagId).run();
-    } catch (error) {
-      // Ignore duplicate key errors
-      if (error instanceof Error && !error.message.includes('UNIQUE constraint failed')) {
-        throw error;
-      }
-    }
-  }
-}
+// assignTagsToMemory is no longer used - replaced by assignTagsToMemoryWithHierarchy
 
 async function getOrCreateTag(db: D1Database, tagName: string): Promise<number> {
   // Try to get existing tag
   const existing = await db.prepare('SELECT id FROM tags WHERE name = ?').bind(tagName).first<{ id: number }>();
-  
+
   if (existing) {
     return existing.id;
   }
-  
+
   // Create new tag
   const result = await db.prepare('INSERT INTO tags (name) VALUES (?)').bind(tagName).run();
   return result.meta.last_row_id as number;
+}
+
+/**
+ * Assign tags to memory with hierarchical tag support
+ * Supports "parent>child" format and creates tag relationships
+ */
+async function assignTagsToMemoryWithHierarchy(db: D1Database, memoryId: string, tagNames: string[]): Promise<void> {
+  for (const tagName of tagNames) {
+    if (!tagName.trim()) continue;
+
+    // Check if tag has hierarchical format (parent>child)
+    if (tagName.includes('>')) {
+      await processHierarchicalTag(db, memoryId, tagName.trim());
+    } else {
+      // Process simple tag
+      const tagId = await getOrCreateTag(db, tagName.trim());
+      await linkTagToMemory(db, memoryId, tagId);
+    }
+  }
+}
+
+/**
+ * Process hierarchical tag in format "parent>child"
+ */
+async function processHierarchicalTag(db: D1Database, memoryId: string, hierarchicalTag: string): Promise<void> {
+  const parts = hierarchicalTag.split('>').map(part => part.trim()).filter(Boolean);
+
+  if (parts.length !== 2) {
+    throw new Error(`Invalid hierarchical tag format: "${hierarchicalTag}". Expected format: "parent>child"`);
+  }
+
+  const [parentTagName, childTagName] = parts;
+
+  try {
+    // Use the service to create tags with relationship
+    const result = await TagHierarchyService.createTagsWithRelationship(
+      db,
+      childTagName,
+      parentTagName
+    );
+
+    // Link both tags to the memory
+    await linkTagToMemory(db, memoryId, result.child_tag.id);
+    await linkTagToMemory(db, memoryId, result.parent_tag.id);
+
+  } catch (error) {
+    // If relationship already exists, still link the tags to memory
+    if (error instanceof Error && error.message.includes('already exists')) {
+      // Get the existing tags and link them
+      const childTag = await TagHierarchyService.getTagByName(db, childTagName);
+      const parentTag = await TagHierarchyService.getTagByName(db, parentTagName);
+
+      if (childTag) await linkTagToMemory(db, memoryId, childTag.id);
+      if (parentTag) await linkTagToMemory(db, memoryId, parentTag.id);
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Link tag to memory with duplicate handling
+ */
+async function linkTagToMemory(db: D1Database, memoryId: string, tagId: number): Promise<void> {
+  try {
+    await db.prepare(`
+      INSERT INTO memory_tags (memory_id, tag_id)
+      VALUES (?, ?)
+    `).bind(memoryId, tagId).run();
+  } catch (error) {
+    // Ignore duplicate key errors (upsert behavior)
+    if (error instanceof Error && !error.message.includes('UNIQUE constraint failed')) {
+      throw error;
+    }
+  }
 }

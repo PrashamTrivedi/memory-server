@@ -7,14 +7,18 @@ class MockContext {
   private jsonData: any;
   private status: number = 200;
   private _env: any;
+  private _headers: Record<string, string>;
 
-  constructor(env: any, private reqBody?: any) {
+  constructor(env: any, private reqBody?: any, headers: Record<string, string> = {}) {
     this._env = env;
+    this._headers = headers;
   }
 
   get req() {
+    const headers = this._headers;
     return {
-      json: async () => this.reqBody
+      json: async () => this.reqBody,
+      header: (name: string) => headers[name] || ''
     };
   }
 

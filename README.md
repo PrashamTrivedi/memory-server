@@ -294,7 +294,7 @@ https://your-worker-subdomain.your-subdomain.workers.dev/mcp
 
 ### Available MCP Tools
 
-The server exposes 9 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
+The server exposes 10 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
 
 #### Core Memory Tools
 
@@ -362,14 +362,29 @@ Returns formatted search results with matching memories, search criteria summary
 }
 ```
 
-**`add_tags`** - Add tags to existing memory
+**`add_tags`** - Add tags to existing memory with hierarchical support
 
 ```json
 {
   "memoryId": "memory-uuid-here",
-  "tags": ["tutorial", "beginner"]
+  "tags": ["tutorial", "beginner", "programming>javascript"]
 }
 ```
+
+*Supports both permanent and temporary memories. Tags can use hierarchical "parent>child" format - relationships are automatically created and both parent and child tags are assigned to the memory.*
+
+**`update_memory`** - Update existing memory or create new (upsert)
+
+```json
+{
+  "id": "memory-uuid-here",
+  "name": "Updated Title",
+  "content": "Updated content here",
+  "tags": ["new-tag", "category>subcategory"]
+}
+```
+
+*Updates an existing memory's name, content, or tags. If the ID is not found, creates a new memory (upsert behavior). Tags support hierarchical "parent>child" format.*
 
 **`review_temporary_memories`** - Review temporary memories with lifecycle status
 
