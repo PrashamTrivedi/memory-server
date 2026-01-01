@@ -13,6 +13,7 @@ import {
   handleUpdateUrlContent,
   handlePromoteMemory,
   handleReviewTemporaryMemories,
+  handleUpdateMemory,
 } from './tools/memory.js'
 
 import {
@@ -150,6 +151,21 @@ export function createMCPMemoryServer(env: Env): McpServer {
     },
     async (args) => {
       return await handleReviewTemporaryMemories(env, args)
+    }
+  )
+
+  server.tool(
+    'update_memory',
+    'Update an existing memory\'s content, name, or tags. Creates new memory if ID not found (upsert behavior).',
+    {
+      id: z.string().describe('Memory ID to update (creates new if not found)'),
+      name: z.string().optional().describe('New name/title (required for new memories)'),
+      content: z.string().optional().describe('New content (required for new memories)'),
+      tags: z.array(z.string()).optional().describe('New tags (replaces existing). Supports hierarchical "parent>child" format'),
+      temporary: z.boolean().optional().describe('Create as temporary memory if creating new (ignored for updates)'),
+    },
+    async (args) => {
+      return await handleUpdateMemory(env, args)
     }
   )
 

@@ -743,3 +743,177 @@ export async function handleReviewTemporaryMemories(env: Env, args: any): Promis
     throw new Error(`Failed to review temporary memories: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+/**
+ * MCP Tool: Update Memory
+ * Updates an existing memory or creates a new one if not found (upsert behavior)
+ */
+export const updateMemoryTool: Tool = {
+  name: 'update_memory',
+  description: 'Update an existing memory or create new if ID not found (upsert behavior)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The UUID of the memory to update (creates new if not found)',
+      },
+      name: {
+        type: 'string',
+        description: 'Name/title for the memory (required for new memories)',
+      },
+      content: {
+        type: 'string',
+        description: 'Content for the memory (required for new memories)',
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Tags for the memory. Supports hierarchical format "parent>child". Replaces existing tags.',
+      },
+      temporary: {
+        type: 'boolean',
+        description: 'Create as temporary memory if creating new (ignored for updates)',
+      },
+    },
+    required: ['id'],
+  },
+};
+
+export async function handleUpdateMemory(env: Env, args: any): Promise<any> {
+  try {
+    const { id, name, content, tags, temporary } = args;
+
+    if (!id) {
+      throw new Error('Memory ID is required');
+    }
+
+    // Check if at least one update field is provided
+    const hasUpdates = name !== undefined || content !== undefined || tags !== undefined;
+
+    // Check temporary memory first
+    const isTemporary = await TemporaryMemoryService.exists(env, id);
+
+    if (isTemporary) {
+      // Update temporary memory
+      const updates: Partial<Memory> = {};
+      if (name !== undefined) updates.name = name;
+      if (content !== undefined) updates.content = content;
+      if (tags !== undefined) updates.tags = tags;
+
+      if (!hasUpdates) {
+        throw new Error('No update fields provided. Specify at least one of: name, content, tags');
+      }
+
+      const updated = await TemporaryMemoryService.update(env, id, updates);
+
+      const markdown = formatMemoryAsMarkdown(updated!);
+      const structuredData = {
+        success: true,
+        data: updated,
+        updated: true,
+        created: false,
+      };
+
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Check D1 for permanent memory
+    const existingMemory = await getMemoryById(env.DB, id);
+
+    if (existingMemory) {
+      // Update permanent memory
+      if (!hasUpdates) {
+        throw new Error('No update fields provided. Specify at least one of: name, content, tags');
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const newName = name !== undefined ? name : existingMemory.name;
+      const newContent = content !== undefined ? content : existingMemory.content;
+
+      // Update the memory record
+      await env.DB.prepare(`
+        UPDATE memories SET name = ?, content = ?, updated_at = ? WHERE id = ?
+      `).bind(newName, newContent, now, id).run();
+
+      // Handle tags replacement if provided
+      if (tags !== undefined) {
+        // Delete existing tags
+        await env.DB.prepare('DELETE FROM memory_tags WHERE memory_id = ?').bind(id).run();
+        // Add new tags
+        if (tags.length > 0) {
+          await assignTagsToMemory(env.DB, id, tags);
+        }
+      }
+
+      // Fetch updated memory
+      const updatedMemory = await getMemoryById(env.DB, id);
+
+      const markdown = formatMemoryAsMarkdown(updatedMemory!);
+      const structuredData = {
+        success: true,
+        data: updatedMemory,
+        updated: true,
+        created: false,
+      };
+
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Memory not found - create new (upsert behavior)
+    if (!name || !content) {
+      throw new Error('Memory not found. To create a new memory, provide both name and content.');
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+
+    if (temporary) {
+      // Create temporary memory
+      const tempMemory: Memory = {
+        id,
+        name,
+        content,
+        tags: tags || [],
+        created_at: now,
+        updated_at: now,
+      };
+      await TemporaryMemoryService.create(env, tempMemory);
+
+      const markdown = formatMemoryAsMarkdown(tempMemory);
+      const structuredData = {
+        success: true,
+        data: tempMemory,
+        updated: false,
+        created: true,
+      };
+
+      return createDualFormatResponse(markdown, structuredData);
+    }
+
+    // Create permanent memory in D1
+    await env.DB.prepare(`
+      INSERT INTO memories (id, name, content, url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(id, name, content, null, now, now).run();
+
+    // Add tags if provided
+    if (tags && tags.length > 0) {
+      await assignTagsToMemory(env.DB, id, tags);
+    }
+
+    const newMemory = await getMemoryById(env.DB, id);
+
+    const markdown = formatMemoryAsMarkdown(newMemory!);
+    const structuredData = {
+      success: true,
+      data: newMemory,
+      updated: false,
+      created: true,
+    };
+
+    return createDualFormatResponse(markdown, structuredData);
+
+  } catch (error) {
+    throw new Error(`Failed to update memory: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
