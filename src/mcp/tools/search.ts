@@ -128,7 +128,7 @@ export const addTagsTool: Tool = {
   inputSchema: {
     type: 'object',
     properties: {
-      memory_id: {
+      memoryId: {
         type: 'string',
         description: 'The UUID of the memory to add tags to',
       },
@@ -139,13 +139,14 @@ export const addTagsTool: Tool = {
         minItems: 1,
       },
     },
-    required: ['memory_id', 'tags'],
+    required: ['memoryId', 'tags'],
   },
 };
 
 export async function handleAddTags(env: Env, args: any): Promise<any> {
   try {
-    const memoryId = args.memory_id || args.memoryId; // Support both camelCase and snake_case
+    // Prefer memoryId (matches zod schema in server.ts), fallback to memory_id for backwards compatibility
+    const memoryId = args.memoryId || args.memory_id;
     const tags = args.tags;
 
     if (!memoryId) {
