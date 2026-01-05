@@ -1,7 +1,6 @@
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js'
-import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import {createMcpHandler, WorkerTransport} from 'agents/mcp'
 import {z} from 'zod'
-import {toReqRes, toFetchResponse} from 'fetch-to-node'
 import type {Env} from '../index.js'
 
 // Tool handlers
@@ -269,98 +268,26 @@ export function createMCPMemoryServer(env: Env): McpServer {
 
 
 /**
- * Create HTTP handler for MCP server using official SDK Streamable HTTP transport
- * with fetch-to-node compatibility layer for Cloudflare Workers
+ * Create HTTP handler for MCP server using Cloudflare's agents/mcp package
+ * with WorkerTransport for native Cloudflare Workers support
  */
 export async function handleMCPHttpRequest(env: Env, request: Request): Promise<Response> {
-  try {
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id, MCP-Protocol-Version',
-        },
-      })
-    }
+  const server = createMCPMemoryServer(env)
 
-    // In stateless mode (Cloudflare Workers), GET requests for SSE streams are not supported
-    // Return 405 Method Not Allowed as per MCP Streamable HTTP spec
-    if (request.method === 'GET') {
-      return new Response(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          error: {
-            code: -32600,
-            message: 'GET requests are not supported in stateless mode. Use POST for MCP requests.',
-          },
-        }),
-        {
-          status: 405,
-          headers: {
-            'Content-Type': 'application/json',
-            'Allow': 'POST, DELETE, OPTIONS',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
-      )
-    }
+  // Use Cloudflare's createMcpHandler with WorkerTransport
+  // enableJsonResponse: true disables SSE streaming for stateless operation
+  // Type assertion needed due to SDK version mismatch between agents package and our direct dependency
+  const handler = createMcpHandler(server as unknown as Parameters<typeof createMcpHandler>[0], {
+    transport: new WorkerTransport({
+      enableJsonResponse: true, // Use JSON responses instead of SSE for stateless mode
+    }),
+  })
 
-    // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
-    const {req, res} = toReqRes(request)
-    
-    // Create new transport for each request (stateless)
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    })
+  // Create a minimal ExecutionContext
+  const ctx = {
+    waitUntil: () => {},
+    passThroughOnException: () => {},
+  } as unknown as ExecutionContext
 
-    const server = createMCPMemoryServer(env)
-    // Connect the transport to the MCP server
-    await server.connect(transport)
-    
-    // Read request body for POST requests
-    const body = request.method === 'POST' ? await request.json() : null
-
-    // Handle the request using the official SDK transport
-    await transport.handleRequest(req, res, body)
-
-
-
-
-
-    // Convert Node.js response back to Cloudflare Response
-    const fetchResponse = await toFetchResponse(res)
-
-    // Add CORS headers
-    const headers = new Headers(fetchResponse.headers);
-    headers.set('Access-Control-Allow-Origin', '*');
-
-    return new Response(fetchResponse.body, {
-      status: fetchResponse.status,
-      statusText: fetchResponse.statusText,
-      headers: headers,
-    });
-
-  } catch (error) {
-    console.error('MCP HTTP request error:', error)
-    return new Response(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        error: {
-          code: -32603,
-          message: 'Internal error',
-          data: error instanceof Error ? error.message : String(error),
-        },
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    )
-  }
+  return handler(request, env, ctx)
 }

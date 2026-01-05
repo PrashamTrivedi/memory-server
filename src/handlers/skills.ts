@@ -109,30 +109,59 @@ export async function generateSkillPackage(c: AppContext) {
     }
 
     // Read template content and replace placeholders
-    const skillMdContent = (await skillMdTemplate.text())
-      .replace(/\{\{SERVER_URL\}\}/g, serverUrl);
+    let skillMdContent: string;
+    let mcpJsonContent: string;
 
-    const mcpJsonContent = (await mcpJsonTemplate.text())
-      .replace(/\{\{SERVER_URL\}\}/g, serverUrl)
-      .replace(/\{\{API_KEY\}\}/g, apiKey);
+    try {
+      skillMdContent = (await skillMdTemplate.text())
+        .replace(/\{\{SERVER_URL\}\}/g, serverUrl);
+
+      mcpJsonContent = (await mcpJsonTemplate.text())
+        .replace(/\{\{SERVER_URL\}\}/g, serverUrl)
+        .replace(/\{\{API_KEY\}\}/g, apiKey);
+    } catch (templateError) {
+      console.error('Template processing error:', templateError);
+      return c.json({
+        success: false,
+        error: 'Failed to process templates'
+      }, 500);
+    }
 
     // Create ZIP using fflate
-    const zipData = zipSync({
-      'memory-skill/SKILL.md': strToU8(skillMdContent),
-      'memory-skill/mcp.json': strToU8(mcpJsonContent)
-    }, { level: 6 });
+    let zipData: Uint8Array;
+    try {
+      zipData = zipSync({
+        'memory-skill/SKILL.md': strToU8(skillMdContent),
+        'memory-skill/mcp.json': strToU8(mcpJsonContent)
+      }, { level: 6 });
+    } catch (zipError) {
+      console.error('ZIP creation error:', zipError);
+      return c.json({
+        success: false,
+        error: 'Failed to create skill package ZIP'
+      }, 500);
+    }
 
     // Generate download token
     const downloadToken = randomBytes(24).toString('hex');
     const expiresAt = now + SKILL_PACKAGE_TTL;
 
-    // Store ZIP in KV - convert Uint8Array to ArrayBuffer for proper storage
+    // Store ZIP in KV
     const zipKey = `skill-zip:${downloadToken}`;
-    const zipBuffer = zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength) as ArrayBuffer;
 
-    await c.env.CACHE_KV.put(zipKey, zipBuffer, {
-      expirationTtl: SKILL_PACKAGE_TTL
-    });
+    try {
+      // Convert Uint8Array to ArrayBuffer for KV storage
+      const zipBuffer = zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength) as ArrayBuffer;
+      await c.env.CACHE_KV.put(zipKey, zipBuffer, {
+        expirationTtl: SKILL_PACKAGE_TTL
+      });
+    } catch (kvError) {
+      console.error('KV storage error:', kvError);
+      return c.json({
+        success: false,
+        error: 'Failed to store skill package'
+      }, 500);
+    }
 
     // Store metadata in KV for reuse
     const metadata: SkillMetadata = {
