@@ -280,10 +280,32 @@ export async function handleMCPHttpRequest(env: Env, request: Request): Promise<
         status: 200,
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+          'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, mcp-session-id, last-event-id, MCP-Protocol-Version',
         },
       })
+    }
+
+    // In stateless mode (Cloudflare Workers), GET requests for SSE streams are not supported
+    // Return 405 Method Not Allowed as per MCP Streamable HTTP spec
+    if (request.method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          error: {
+            code: -32600,
+            message: 'GET requests are not supported in stateless mode. Use POST for MCP requests.',
+          },
+        }),
+        {
+          status: 405,
+          headers: {
+            'Content-Type': 'application/json',
+            'Allow': 'POST, DELETE, OPTIONS',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      )
     }
 
     // Convert Cloudflare Request to Node.js-compatible req/res using fetch-to-node
