@@ -3,8 +3,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { zipSync, strToU8 } from 'fflate';
 import { Env } from '../../types';
 import {
-  generateSkillMd,
-  generateMcpJson,
   generateMcpJsonRedacted,
   getInstallationSteps,
   redactApiKey,
@@ -93,9 +91,30 @@ export async function generateSkillPackage(c: AppContext) {
       .bind(skillKeyId, keyHash, skillKeyName, now, parentKeyId)
       .run();
 
-    // Generate skill package files
-    const skillMdContent = generateSkillMd(serverUrl);
-    const mcpJsonContent = JSON.stringify(generateMcpJson(serverUrl, apiKey), null, 2);
+    // Fetch templates from R2
+    const [skillMdTemplate, mcpJsonTemplate] = await Promise.all([
+      c.env.SKILL_TEMPLATES.get('SKILL.md'),
+      c.env.SKILL_TEMPLATES.get('mcp.json')
+    ]);
+
+    if (!skillMdTemplate || !mcpJsonTemplate) {
+      console.error('Missing templates in R2:', {
+        skillMd: !!skillMdTemplate,
+        mcpJson: !!mcpJsonTemplate
+      });
+      return c.json({
+        success: false,
+        error: 'Skill templates not found'
+      }, 500);
+    }
+
+    // Read template content and replace placeholders
+    const skillMdContent = (await skillMdTemplate.text())
+      .replace(/\{\{SERVER_URL\}\}/g, serverUrl);
+
+    const mcpJsonContent = (await mcpJsonTemplate.text())
+      .replace(/\{\{SERVER_URL\}\}/g, serverUrl)
+      .replace(/\{\{API_KEY\}\}/g, apiKey);
 
     // Create ZIP using fflate
     const zipData = zipSync({
@@ -107,9 +126,11 @@ export async function generateSkillPackage(c: AppContext) {
     const downloadToken = randomBytes(24).toString('hex');
     const expiresAt = now + SKILL_PACKAGE_TTL;
 
-    // Store ZIP in KV
+    // Store ZIP in KV - convert Uint8Array to ArrayBuffer for proper storage
     const zipKey = `skill-zip:${downloadToken}`;
-    await c.env.CACHE_KV.put(zipKey, zipData, {
+    const zipBuffer = zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength) as ArrayBuffer;
+
+    await c.env.CACHE_KV.put(zipKey, zipBuffer, {
       expirationTtl: SKILL_PACKAGE_TTL
     });
 

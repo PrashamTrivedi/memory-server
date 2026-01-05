@@ -60,5 +60,11 @@
   "browser": {
     "binding": "BROWSER"
   },
-  
+  // R2 bucket for skill templates
+  "r2_buckets": [
+    {
+      "binding": "SKILL_TEMPLATES",
+      "bucket_name": "memory-skill-templates"
+    }
+  ]
 }

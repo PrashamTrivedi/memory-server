@@ -173,6 +173,9 @@ export interface Env {
   // OAuth JWT signing secret
   JWT_SECRET: string;
 
+  // R2 bucket for skill templates
+  SKILL_TEMPLATES: R2Bucket;
+
   // Email notification settings (optional)
   EMAIL_API_KEY?: string;
   NOTIFICATION_EMAIL?: string;
