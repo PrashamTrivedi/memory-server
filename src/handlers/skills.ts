@@ -119,6 +119,11 @@ export async function generateSkillPackage(c: AppContext) {
       mcpJsonContent = (await mcpJsonTemplate.text())
         .replace(/\{\{SERVER_URL\}\}/g, serverUrl)
         .replace(/\{\{API_KEY\}\}/g, apiKey);
+
+      console.log('Template content lengths:', {
+        skillMd: skillMdContent.length,
+        mcpJson: mcpJsonContent.length
+      });
     } catch (templateError) {
       console.error('Template processing error:', templateError);
       return c.json({
@@ -130,10 +135,25 @@ export async function generateSkillPackage(c: AppContext) {
     // Create ZIP using fflate
     let zipData: Uint8Array;
     try {
+      const skillMdBytes = strToU8(skillMdContent);
+      const mcpJsonBytes = strToU8(mcpJsonContent);
+
+      console.log('Byte array lengths:', {
+        skillMd: skillMdBytes.length,
+        mcpJson: mcpJsonBytes.length
+      });
+
       zipData = zipSync({
-        'memory-skill/SKILL.md': strToU8(skillMdContent),
-        'memory-skill/mcp.json': strToU8(mcpJsonContent)
+        'memory-skill/SKILL.md': skillMdBytes,
+        'memory-skill/mcp.json': mcpJsonBytes
       }, { level: 6 });
+
+      console.log('ZIP data:', {
+        length: zipData.length,
+        byteLength: zipData.byteLength,
+        byteOffset: zipData.byteOffset,
+        bufferByteLength: zipData.buffer.byteLength
+      });
     } catch (zipError) {
       console.error('ZIP creation error:', zipError);
       return c.json({
@@ -146,14 +166,19 @@ export async function generateSkillPackage(c: AppContext) {
     const downloadToken = randomBytes(24).toString('hex');
     const expiresAt = now + SKILL_PACKAGE_TTL;
 
-    // Store ZIP in KV
+    // Store ZIP in KV - use Uint8Array directly instead of slicing buffer
     const zipKey = `skill-zip:${downloadToken}`;
 
     try {
-      // Convert Uint8Array to ArrayBuffer for KV storage
-      const zipBuffer = zipData.buffer.slice(zipData.byteOffset, zipData.byteOffset + zipData.byteLength) as ArrayBuffer;
-      await c.env.CACHE_KV.put(zipKey, zipBuffer, {
+      // Store Uint8Array directly - KV accepts ArrayBufferView
+      await c.env.CACHE_KV.put(zipKey, zipData, {
         expirationTtl: SKILL_PACKAGE_TTL
+      });
+
+      // Verify storage
+      const stored = await c.env.CACHE_KV.get(zipKey, 'arrayBuffer');
+      console.log('Stored ZIP verification:', {
+        storedSize: stored?.byteLength ?? 0
       });
     } catch (kvError) {
       console.error('KV storage error:', kvError);
