@@ -180,7 +180,12 @@ app.get('/mcp/health', (c) => {
       'add_tags',
       'update_url_content',
       'promote_memory',
-      'review_temporary_memories'
+      'review_temporary_memories',
+      'update_memory',
+      'list_tags',
+      'rename_tag',
+      'merge_tags',
+      'set_tag_parent'
     ]
   });
 });

@@ -20,6 +20,13 @@ import {
   handleAddTags,
 } from './tools/search.js'
 
+import {
+  handleListTags,
+  handleRenameTag,
+  handleMergeTags,
+  handleSetTagParent,
+} from './tools/tags.js'
+
 // Resource handlers
 import {
   handleMemoryResource,
@@ -165,6 +172,52 @@ export function createMCPMemoryServer(env: Env): McpServer {
     },
     async (args) => {
       return await handleUpdateMemory(env, args)
+    }
+  )
+
+  // Tag management tools
+  server.tool(
+    'list_tags',
+    'List all tags with their hierarchy relationships and memory counts',
+    {},
+    async () => {
+      return await handleListTags(env)
+    }
+  )
+
+  server.tool(
+    'rename_tag',
+    'Rename an existing tag',
+    {
+      tagId: z.number().describe('Tag ID to rename'),
+      newName: z.string().describe('New name for the tag'),
+    },
+    async (args) => {
+      return await handleRenameTag(env, args)
+    }
+  )
+
+  server.tool(
+    'merge_tags',
+    'Merge one tag into another, moving all memory associations. The source tag is deleted.',
+    {
+      sourceTagId: z.number().describe('Tag ID to merge from (will be deleted)'),
+      targetTagId: z.number().describe('Tag ID to merge into (will be kept)'),
+    },
+    async (args) => {
+      return await handleMergeTags(env, args)
+    }
+  )
+
+  server.tool(
+    'set_tag_parent',
+    'Set or remove parent-child relationship between tags',
+    {
+      childTagId: z.number().describe('Child tag ID'),
+      parentTagId: z.number().nullable().describe('Parent tag ID (null to remove parent and make root tag)'),
+    },
+    async (args) => {
+      return await handleSetTagParent(env, args)
     }
   )
 

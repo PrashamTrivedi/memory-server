@@ -176,6 +176,9 @@ export interface Env {
   // R2 bucket for skill templates
   SKILL_TEMPLATES: R2Bucket;
 
+  // KV namespace for MCP Apps UI bundles
+  MCP_APPS_KV?: KVNamespace;
+
   // Email notification settings (optional)
   EMAIL_API_KEY?: string;
   NOTIFICATION_EMAIL?: string;

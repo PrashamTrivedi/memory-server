@@ -50,6 +50,11 @@
     {
       "binding": "TEMP_MEMORIES_KV",
       "id": "04721ad34777453f9ae3fcd1e6a0c4c8"
+    },
+    // MCP Apps UI bundles storage
+    {
+      "binding": "MCP_APPS_KV",
+      "id": "placeholder-create-with-wrangler-kv-namespace-create"
     }
   ],
   // Environment variables
