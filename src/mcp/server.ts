@@ -34,6 +34,11 @@ import {
   listMemoryResources,
 } from './resources/memory.js'
 
+import {
+  handleUiAppResource,
+  listUiAppResources,
+} from './resources/ui-apps.js'
+
 // Prompt handlers
 import {
   availableWorkflowPrompts,
@@ -281,6 +286,23 @@ export function createMCPMemoryServer(env: Env): McpServer {
       }
     }
   )
+
+  // Register UI app resources
+  const uiApps = listUiAppResources()
+  for (const app of uiApps) {
+    server.registerResource(
+      app.name.toLowerCase().replace(/\s+/g, '-'),
+      app.uri,
+      {
+        title: app.name,
+        description: app.description,
+        mimeType: 'text/html'
+      },
+      async (uri: URL) => {
+        return await handleUiAppResource(env, uri.toString())
+      }
+    )
+  }
 
   // Register prompts
   availableWorkflowPrompts.forEach(prompt => {
