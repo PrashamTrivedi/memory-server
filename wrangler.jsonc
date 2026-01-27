@@ -54,7 +54,7 @@
     // MCP Apps UI bundles storage
     {
       "binding": "MCP_APPS_KV",
-      "id": "placeholder-create-with-wrangler-kv-namespace-create"
+      "id": "63b107b290d142b0a0e46db959ba1e51"
     }
   ],
   // Environment variables
