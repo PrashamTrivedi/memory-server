@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { TagManagement, MemoryManagement, TemporaryMemoryReview, ApiKeys, SkillDownload } from './pages';
+import { TagManagement, MemoryManagement, TemporaryMemoryReview, ApiKeys, SkillDownload, McpAppsAdmin } from './pages';
 import { useTheme } from './contexts/ThemeContext';
 import { useMemoryStats } from './api/memory';
 import { api } from './api/client';
 import './App.css';
 import './components/TagHierarchy.css';
 
-type AppView = 'home' | 'tags' | 'memories' | 'temporary-memories' | 'api-keys' | 'skill-download';
+type AppView = 'home' | 'tags' | 'memories' | 'temporary-memories' | 'api-keys' | 'skill-download' | 'mcp-apps';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('memories'); // Default to memories view
@@ -43,6 +43,8 @@ function App() {
         return <ApiKeys />;
       case 'skill-download':
         return <SkillDownload />;
+      case 'mcp-apps':
+        return <McpAppsAdmin />;
       default:
         return (
           <div className="home-view">
@@ -248,6 +250,18 @@ function App() {
               <path d="M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Skill
+          </button>
+          <button
+            className={`nav-button ${currentView === 'mcp-apps' ? 'active' : ''}`}
+            onClick={() => setCurrentView('mcp-apps')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2"/>
+              <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2"/>
+              <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2"/>
+              <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            MCP Apps
           </button>
         </nav>
       </header>
