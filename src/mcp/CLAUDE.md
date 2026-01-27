@@ -5,7 +5,7 @@ Model Context Protocol implementation using `@modelcontextprotocol/sdk`.
 ## Structure
 
 - `server.ts` - MCP server setup, tool/resource/prompt registration
-- `tools/` - Tool handlers (memory.ts, search.ts)
+- `tools/` - Tool handlers (memory.ts, search.ts, tags.ts)
 - `resources/` - Resource handlers for `memory://` URIs
 - `prompts/` - Workflow prompt definitions
 - `utils/` - MCP response formatters

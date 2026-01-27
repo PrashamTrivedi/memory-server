@@ -18,6 +18,7 @@ code snippets with intelligent tagging and retrieval.
 - 🔄 **Real-time Sync** - KV cache for performance
 - 🎯 **Workflow Prompts** - Pre-built AI workflows for memory management
 - ⏳ **Temporary Memories** - TTL-based memories that auto-promote with repeated access
+- 🖼️ **MCP Apps** - Interactive UIs for memory browsing, editing, triage, and tag management
 
 ## Hierarchical Tagging System
 
@@ -181,6 +182,7 @@ POST /api/memories/:id/promote
    # Create KV namespaces
    wrangler kv namespace create "CACHE_KV"
    wrangler kv namespace create "TEMP_MEMORIES_KV"
+   wrangler kv namespace create "MCP_APPS_KV"
 
    # Run migrations
    npm run db:migrate
@@ -294,7 +296,7 @@ https://your-worker-subdomain.your-subdomain.workers.dev/mcp
 
 ### Available MCP Tools
 
-The server exposes 10 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
+The server exposes 14 memory management tools via MCP. All tools return responses in dual-format (Markdown + JSON) for optimal AI agent comprehension.
 
 #### Core Memory Tools
 
@@ -407,6 +409,49 @@ Returns formatted search results with matching memories, search criteria summary
 
 *Immediately promotes a temporary memory to permanent storage without waiting for the auto-promotion threshold. Returns an error if the memory is already permanent or does not exist.*
 
+#### Tag Management Tools
+
+**`list_tags`** - List all tags with hierarchy and memory counts
+
+```json
+{}
+```
+
+*Returns a hierarchical view of all tags with their parent-child relationships and the number of memories associated with each tag.*
+
+**`rename_tag`** - Rename an existing tag
+
+```json
+{
+  "tagId": 42,
+  "newName": "new-tag-name"
+}
+```
+
+*Renames a tag while preserving all memory associations and hierarchy relationships.*
+
+**`merge_tags`** - Merge one tag into another
+
+```json
+{
+  "sourceTagId": 42,
+  "targetTagId": 17
+}
+```
+
+*Moves all memory associations from source tag to target tag, transfers child tags, then deletes the source tag.*
+
+**`set_tag_parent`** - Set or remove parent-child relationship
+
+```json
+{
+  "childTagId": 42,
+  "parentTagId": 17
+}
+```
+
+*Sets a parent tag for the specified child tag. Pass `null` for parentTagId to make it a root tag. Prevents circular hierarchies.*
+
 ### MCP Resources
 
 Access memory data through resource URIs:
@@ -414,6 +459,19 @@ Access memory data through resource URIs:
 - **`memory://list`** - List all available memories with metadata
 - **`memory://{id}`** - Get specific memory with full content and metadata
 - **`memory://{id}/text`** - Get memory content as plain text
+
+### MCP Apps (Interactive UIs)
+
+For MCP hosts that support the Apps extension, four interactive UIs are available:
+
+| Resource URI | Description |
+|--------------|-------------|
+| `ui://memory-browser` | Browse and filter memories with search, tag filtering, and bulk actions |
+| `ui://memory-editor` | Markdown editor with live preview for creating/editing memories |
+| `ui://triage-dashboard` | Review temporary memories with urgency indicators and quick promote/dismiss |
+| `ui://tag-manager` | Visual tag hierarchy tree with rename, merge, and reparent operations |
+
+Apps are built with Preact and Tailwind CSS, bundled as single-file HTML, and served from KV storage.
 
 ### Workflow Prompts
 
@@ -711,6 +769,16 @@ src/
 │   ├── prompts/          # Workflow prompt definitions
 │   └── transport/        # HTTP transport for Cloudflare Workers
 └── types/                # TypeScript type definitions
+
+mcp-apps/                 # MCP Apps (interactive UIs)
+├── src/
+│   ├── memory-browser/   # Memory browsing UI
+│   ├── memory-editor/    # Markdown editor UI
+│   ├── triage-dashboard/ # Temporary memory triage UI
+│   ├── tag-manager/      # Tag hierarchy management UI
+│   └── shared/           # Shared components and utilities
+├── vite.config.ts        # Vite build config with single-file output
+└── package.json          # Preact, Tailwind, vite-plugin-singlefile
 ```
 
 ### Available Scripts
@@ -722,6 +790,10 @@ npm run deploy       # Deploy to Cloudflare Workers
 npm run db:migrate   # Run database migrations
 npm run type-check   # TypeScript type checking
 npm run test         # Run tests
+
+# MCP Apps
+cd mcp-apps && npm run build          # Build all MCP Apps
+./scripts/deploy-mcp-apps.sh          # Deploy apps to KV storage
 ```
 
 ### Environment Variables
@@ -746,9 +818,10 @@ binding = "TEMP_MEMORIES_KV"
 id = "your-temp-memories-kv-namespace-id"
 ```
 
-**Note:** The `TEMP_MEMORIES_KV` namespace is required for the temporary memories feature. Create it with:
+**Note:** The `TEMP_MEMORIES_KV` namespace is required for the temporary memories feature. The `MCP_APPS_KV` namespace is required for serving MCP Apps. Create them with:
 ```bash
 wrangler kv namespace create "TEMP_MEMORIES_KV"
+wrangler kv namespace create "MCP_APPS_KV"
 ```
 
 ## Contributing
