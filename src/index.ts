@@ -4,6 +4,7 @@ import * as tagHierarchyHandlers from './handlers/tagHierarchy';
 import * as memoryHandlers from './handlers/memory';
 import * as apiKeyHandlers from './handlers/apiKeys';
 import * as skillHandlers from './handlers/skills';
+import * as mcpAppsAdminHandlers from './handlers/mcpAppsAdmin';
 import { handleMCPHttpRequest } from './mcp/server';
 import { getEntityName } from './middleware/apiKeyAuth';
 import { dualAuth } from './middleware/dualAuth';
@@ -148,6 +149,12 @@ app.get('/api/admin/keys', apiKeyHandlers.listApiKeys);
 app.get('/api/admin/keys/:id', apiKeyHandlers.getApiKey);
 app.patch('/api/admin/keys/:id', apiKeyHandlers.updateApiKey);
 app.delete('/api/admin/keys/:id', apiKeyHandlers.revokeApiKey);
+
+// MCP Apps Admin endpoints
+app.get('/api/admin/mcp-apps', mcpAppsAdminHandlers.listMcpApps);
+app.get('/api/admin/mcp-apps/:appName', mcpAppsAdminHandlers.getMcpAppMetadata);
+app.put('/api/admin/mcp-apps/:appName', mcpAppsAdminHandlers.uploadMcpApp);
+app.delete('/api/admin/mcp-apps/:appName', mcpAppsAdminHandlers.deleteMcpApp);
 
 // Skill Package Generation endpoints
 app.post('/api/skills/generate', skillHandlers.generateSkillPackage);
