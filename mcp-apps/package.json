@@ -1,0 +1,30 @@
+{
+  "name": "@memory-server/mcp-apps",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:memory-browser && npm run build:memory-editor && npm run build:triage-dashboard && npm run build:tag-manager",
+    "build:memory-browser": "APP=memory-browser vite build",
+    "build:memory-editor": "APP=memory-editor vite build",
+    "build:triage-dashboard": "APP=triage-dashboard vite build",
+    "build:tag-manager": "APP=tag-manager vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "preact": "^10.19.3",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "marked": "^11.0.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.8.2",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^0.13.5",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "typescript": "^5.3.0"
+  }
+}
