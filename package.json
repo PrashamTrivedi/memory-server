@@ -18,9 +18,15 @@
     "test:coverage": "vitest run --coverage",
     "cf-typegen": "wrangler types"
   },
+  "overrides": {
+    "agents": {
+      "@modelcontextprotocol/sdk": "^1.25.1"
+    }
+  },
   "dependencies": {
     "@hono/node-server": "^1.8.0",
-    "@modelcontextprotocol/sdk": "^1.17.5",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "agents": "^0.3.3",
     "fetch-to-node": "^2.1.0",
     "fflate": "^0.8.2",

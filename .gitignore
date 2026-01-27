@@ -50,3 +50,15 @@ temp/
 gha-creds-*.json
 .claude-trace/
 .dev.vars
+
+# Claude Code sandbox artifacts (Linux bug creates empty dotfiles in project dir)
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.mcp.json
+.profile
+.ripgreprc
+.zprofile
+.zshrc
+.claude/
