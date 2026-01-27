@@ -41,7 +41,7 @@
     "@types/uuid": "^9.0.0",
     "typescript": "^5.3.0",
     "vitest": "^3.2.4",
-    "wrangler": "^4.48.0"
+    "wrangler": "^4.59.1"
   },
   "keywords": [
     "cloudflare-workers",
