@@ -26,8 +26,8 @@
   "dependencies": {
     "@hono/node-server": "^1.8.0",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
-    "@modelcontextprotocol/sdk": "^1.25.1",
-    "agents": "^0.3.3",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "agents": "^0.3.6",
     "fetch-to-node": "^2.1.0",
     "fflate": "^0.8.2",
     "hono": "^4.10.5",
