@@ -132,7 +132,7 @@ export function MemoryDetail({ memory, onClose, onEdit, onDelete, onTagClick }: 
                 {memory.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="tag clickable-tag"
+                    className={`tag${onTagClick ? ' clickable-tag' : ''}`}
                     onClick={() => onTagClick?.(tag)}
                     role="button"
                     tabIndex={0}

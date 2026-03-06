@@ -120,7 +120,7 @@ export function MemoryCard({ memory, onClick, onEdit, onDelete, onTagClick }: Me
           {memory.tags.slice(0, 3).map((tag, index) => (
             <span
               key={index}
-              className="memory-tag clickable-tag"
+              className={`memory-tag${onTagClick ? ' clickable-tag' : ''}`}
               onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
               role="button"
               tabIndex={0}

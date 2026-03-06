@@ -127,7 +127,7 @@ export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting, o
           {memory.tags.slice(0, 3).map((tag, index) => (
             <span
               key={index}
-              className="memory-tag clickable-tag"
+              className={`memory-tag${onTagClick ? ' clickable-tag' : ''}`}
               onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
               role="button"
               tabIndex={0}
