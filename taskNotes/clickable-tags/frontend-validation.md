@@ -12,14 +12,14 @@
 |-------|--------|
 | TypeScript type-check (`tsc --noEmit`) | PASS -- zero errors |
 | Production build (`vite build`) | PASS -- 122 modules transformed, no warnings |
-| Dev server (`vite --port 5173`) | PASS -- starts in ~342ms, serves index.html |
+| Dev server (`vite --port 5174`) | PASS -- starts in ~356ms, serves index.html correctly |
 
 ---
 
 ## 2. Component-Level Code Review
 
 ### 2.1 MemoryCard.tsx
-- `onTagClick` prop: correctly declared as optional `(tag: string) => void`
+- `onTagClick` prop: correctly declared as optional `(tag: string) => void` -- PASS
 - Tags rendered with `className="memory-tag clickable-tag"` -- PASS
 - `role="button"` and `tabIndex={0}` for accessibility -- PASS
 - `e.stopPropagation()` on click to prevent card navigation -- PASS
@@ -31,7 +31,7 @@
 - Tags use `className="tag clickable-tag"` -- PASS
 - `role="button"` and `tabIndex={0}` present -- PASS
 - Keyboard support (`onKeyDown` with Enter) -- PASS
-- All tags shown (no slice), which is correct for detail view -- PASS
+- All tags shown (no slice), correct for detail view -- PASS
 
 ### 2.3 TemporaryMemoryCard.tsx
 - `onTagClick` prop: correctly declared as optional -- PASS
@@ -54,9 +54,10 @@
 - Load more disabled when in tag filter mode -- PASS
 
 ### 2.6 memory.ts (API hooks)
-- `useMemoriesByTag(tag: string | null)` hook present -- PASS
+- `useMemoriesByTag(tag: string | null)` hook exported -- PASS
 - Uses `searchMemories` with `tags: [tag!]` and `query: ''` -- PASS
 - `enabled: !!tag` prevents firing when tag is null -- PASS
+- Unique query key: `['memories', 'byTag', tag]` -- PASS
 
 ---
 
@@ -64,7 +65,7 @@
 
 ### 3.1 MemoryCard.css
 - `.memory-tag.clickable-tag { cursor: pointer; }` -- PASS
-- `.memory-tag:hover` has translateY and box-shadow effects -- PASS
+- `.memory-tag:hover` has translateY(-1px) and box-shadow effects -- PASS
 - Shimmer animation on hover via `::before` pseudo-element -- PASS
 
 ### 3.2 MemoryDetail.css
@@ -73,69 +74,81 @@
 
 ### 3.3 MemoryManagement.css
 - `.active-tag-filter` styled as inline-flex pill with gradient background -- PASS
-- `.active-tag-filter-clear` button styled with hover state (bg changes to primary) -- PASS
+- `.active-tag-filter-clear` button styled with hover state (bg fills primary) -- PASS
 - `.active-tag-filter-label` and `.active-tag-filter-tag` differentiated by color/weight -- PASS
 
 ---
 
 ## 4. Issues Found
 
-### 4.1 Medium: TemporaryMemoryReview page does not pass onTagClick
+### 4.1 [Medium] TemporaryMemoryReview page does not pass onTagClick
 
 **File:** `/home/user/memory-server/ui/src/pages/TemporaryMemoryReview.tsx`
-**Lines:** 117-124 (TemporaryMemoryCard usage) and 144-154 (MemoryDetail usage)
+**Lines:** 117-124 (TemporaryMemoryCard) and 144-154 (MemoryDetail)
 
-The `TemporaryMemoryReview` page renders `TemporaryMemoryCard` and `MemoryDetail`
-but does NOT pass `onTagClick` to either component. This means:
+The `TemporaryMemoryReview` page renders both `TemporaryMemoryCard` and `MemoryDetail`
+without passing the `onTagClick` prop. Consequence:
 
-- Tags on temporary memory cards will render with `clickable-tag` class and cursor:pointer
-  styling, but clicking them does nothing (the `onTagClick?.()` call is a no-op since
-  the prop is undefined).
-- Tags in the detail modal for temporary memories also do nothing when clicked.
+- Tags on temporary memory cards render with `clickable-tag` class and `cursor: pointer`
+  but clicking them does nothing (`onTagClick?.()` is a no-op when undefined).
+- Tags in the detail modal for temporary memories are likewise non-functional.
+- This creates a UX inconsistency: tags appear interactive but produce no result.
 
-This is a user experience inconsistency: tags look clickable but do not function.
+**Suggested fix (pick one):**
+1. Wire `onTagClick` in TemporaryMemoryReview to navigate to MemoryManagement with the
+   tag pre-selected (requires React Router navigation, e.g., `navigate('/memories?tag=foo')`).
+2. Conditionally apply `clickable-tag` class only when `onTagClick` is provided, so tags
+   do not appear interactive when the handler is absent.
 
-**Suggested fix:** Either:
-1. Wire up `onTagClick` in TemporaryMemoryReview to navigate to MemoryManagement
-   with the tag filter active (requires cross-page navigation, e.g., via React Router).
-2. Or, at minimum, do not apply `clickable-tag` class when `onTagClick` is not provided,
-   so tags do not appear interactive when they are not.
-
-### 4.2 Low: useMemoriesByTag sends empty query string
+### 4.2 [Low] useMemoriesByTag sends empty query string to search endpoint
 
 **File:** `/home/user/memory-server/ui/src/api/memory.ts`
 **Line:** 144
 
 `useMemoriesByTag` calls `searchMemories({ query: '', tags: [tag!], limit: 50 })`.
-The `searchMemories` method appends `query` as a URL param unconditionally, resulting
-in `?query=&tags=sometag&limit=50`. This works if the backend treats empty query as
-"match all filtered by tags," but could fail if the backend requires a non-empty query
-or uses it for semantic search ranking. Verify backend behavior.
+The `searchMemories` method always appends `query` as a URL param, producing
+`?query=&tags=sometag&limit=50`. If the backend requires a non-empty query or uses
+it for semantic ranking, this could yield unexpected results or an error.
+
+**Suggested fix:** Confirm backend supports empty-query + tags-only filtering. If not,
+add a dedicated tag-filter endpoint or skip appending `query` when it is empty.
+
+### 4.3 [Low] No :focus-visible styles for clickable tags
+
+Tags have `tabIndex={0}` for keyboard accessibility but no explicit `:focus-visible`
+CSS rule. The browser default focus ring applies, which may not match the app's design
+language. Consider adding a `:focus-visible` style to `.clickable-tag` for a polished
+keyboard navigation experience.
 
 ---
 
-## 5. Accessibility
+## 5. Accessibility Summary
 
 | Check | Result |
 |-------|--------|
 | `role="button"` on clickable tags | PASS |
 | `tabIndex={0}` for keyboard focus | PASS |
 | `onKeyDown` Enter handler | PASS |
-| Focus ring / outline styling | NOT EXPLICITLY SET -- relies on browser defaults. Consider adding `:focus-visible` styles for clickable-tag. |
+| `cursor: pointer` visual cue | PASS |
+| `e.stopPropagation()` prevents parent click | PASS |
+| `:focus-visible` styling | NOT SET (uses browser defaults) |
 
 ---
 
-## 6. Summary
+## 6. Verdict
 
-**Overall: PASS with minor issues**
+**PASS with minor issues**
 
 All core requirements for the clickable tags feature are correctly implemented in the
-primary flow (MemoryManagement page). The code compiles cleanly, the build succeeds,
-and the dev server runs without errors.
+primary Memory Management flow. The TypeScript compiles cleanly, the production build
+succeeds, and the dev server runs without errors.
 
-Two issues were identified:
-- **Medium:** Tags on the TemporaryMemoryReview page appear clickable but are non-functional (missing `onTagClick` prop wiring).
-- **Low:** Empty query string in `useMemoriesByTag` -- depends on backend behavior.
+| Priority | Count | Description |
+|----------|-------|-------------|
+| Critical | 0 | -- |
+| High     | 0 | -- |
+| Medium   | 1 | Tags on TemporaryMemoryReview appear clickable but are non-functional |
+| Low      | 2 | Empty query in useMemoriesByTag; missing :focus-visible styles |
 
 ### Files Reviewed
 - `/home/user/memory-server/ui/src/components/MemoryCard.tsx`
@@ -145,6 +158,7 @@ Two issues were identified:
 - `/home/user/memory-server/ui/src/components/TemporaryMemoryCard.tsx`
 - `/home/user/memory-server/ui/src/components/TemporaryMemoryCard.css`
 - `/home/user/memory-server/ui/src/components/MemoryList.tsx`
+- `/home/user/memory-server/ui/src/components/MemoryList.css`
 - `/home/user/memory-server/ui/src/pages/MemoryManagement.tsx`
 - `/home/user/memory-server/ui/src/pages/MemoryManagement.css`
 - `/home/user/memory-server/ui/src/pages/TemporaryMemoryReview.tsx`
