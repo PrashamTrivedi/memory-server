@@ -2,6 +2,7 @@ import {useState, useCallback} from 'react'
 import {
   useInfiniteMemories,
   useSearchMemories,
+  useMemoriesByTag,
   useCreateMemory,
   useUpdateMemory,
   useDeleteMemory,
@@ -21,12 +22,14 @@ export function MemoryManagement() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  // API hooks  
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+  // API hooks
   const {data: memoriesData, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage} = useInfiniteMemories(3)
   const {data: searchResults, isLoading: isSearching} = useSearchMemories({
     query: searchQuery,
     limit: 20,
   })
+  const {data: tagFilterResults, isLoading: isFilteringByTag} = useMemoriesByTag(activeTag)
   const {data: stats} = useMemoryStats()
 
   const createMemoryMutation = useCreateMemory()
@@ -35,13 +38,26 @@ export function MemoryManagement() {
 
   // Determine which memories to show
   const isSearchMode = searchQuery.trim().length > 0
-  const memories = isSearchMode 
-    ? (searchResults?.memories || []) 
-    : (memoriesData?.pages?.flatMap(page => page.memories) || [])
-  const isLoadingMemories = isSearchMode ? isSearching : isLoading
+  const isTagFilterMode = !!activeTag && !isSearchMode
+  const memories = isSearchMode
+    ? (searchResults?.memories || [])
+    : isTagFilterMode
+      ? (tagFilterResults?.memories || [])
+      : (memoriesData?.pages?.flatMap(page => page.memories) || [])
+  const isLoadingMemories = isSearchMode ? isSearching : isTagFilterMode ? isFilteringByTag : isLoading
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
+    if (query.trim()) {
+      setActiveTag(null)
+    }
+  }, [])
+
+  const handleTagClick = useCallback((tag: string) => {
+    setActiveTag(tag)
+    setSearchQuery('')
+    setSelectedMemory(null)
+    setViewMode('list')
   }, [])
 
   const handleCreateMemory = async (data: CreateMemoryRequest | UpdateMemoryRequest) => {
@@ -161,6 +177,7 @@ export function MemoryManagement() {
             }}
             onEdit={() => setViewMode('edit')}
             onDelete={() => handleDeleteMemory(selectedMemory)}
+            onTagClick={handleTagClick}
           />
         ) : null
 
@@ -185,6 +202,22 @@ export function MemoryManagement() {
               </div>
             )}
 
+            {isTagFilterMode && activeTag && (
+              <div className="active-tag-filter">
+                <span className="active-tag-filter-label">Filtering by tag:</span>
+                <span className="active-tag-filter-tag">{activeTag}</span>
+                <button
+                  className="active-tag-filter-clear"
+                  onClick={() => setActiveTag(null)}
+                  title="Clear tag filter"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+
             <MemoryList
               memories={memories}
               loading={isLoadingMemories || isFetchingNextPage}
@@ -192,8 +225,9 @@ export function MemoryManagement() {
               onMemoryClick={handleMemoryClick}
               onMemoryEdit={handleMemoryEdit}
               onMemoryDelete={handleDeleteMemory}
-              onLoadMore={!isSearchMode ? handleLoadMore : undefined}
-              hasMore={!isSearchMode && hasNextPage}
+              onLoadMore={!isSearchMode && !isTagFilterMode ? handleLoadMore : undefined}
+              hasMore={!isSearchMode && !isTagFilterMode && hasNextPage}
+              onTagClick={handleTagClick}
             />
           </div>
         )

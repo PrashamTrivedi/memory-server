@@ -138,6 +138,14 @@ export function useSearchMemories(request: SearchMemoryRequest) {
   })
 }
 
+export function useMemoriesByTag(tag: string | null) {
+  return useQuery({
+    queryKey: ['memories', 'byTag', tag],
+    queryFn: () => memoryApi.searchMemories({ query: '', tags: [tag!], limit: 50 }),
+    enabled: !!tag,
+  })
+}
+
 export function useMemoryStats() {
   return useQuery({
     queryKey: ['memories', 'stats'],

@@ -6,9 +6,10 @@ interface MemoryCardProps {
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onTagClick?: (tag: string) => void;
 }
 
-export function MemoryCard({ memory, onClick, onEdit, onDelete }: MemoryCardProps) {
+export function MemoryCard({ memory, onClick, onEdit, onDelete, onTagClick }: MemoryCardProps) {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -117,7 +118,14 @@ export function MemoryCard({ memory, onClick, onEdit, onDelete }: MemoryCardProp
       {memory.tags && memory.tags.length > 0 && (
         <div className="memory-card-tags">
           {memory.tags.slice(0, 3).map((tag, index) => (
-            <span key={index} className="memory-tag">
+            <span
+              key={index}
+              className="memory-tag clickable-tag"
+              onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onTagClick?.(tag); } }}
+            >
               {tag}
             </span>
           ))}
