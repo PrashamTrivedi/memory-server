@@ -6,9 +6,10 @@ interface MemoryDetailProps {
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onTagClick?: (tag: string) => void;
 }
 
-export function MemoryDetail({ memory, onClose, onEdit, onDelete }: MemoryDetailProps) {
+export function MemoryDetail({ memory, onClose, onEdit, onDelete, onTagClick }: MemoryDetailProps) {
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -129,7 +130,14 @@ export function MemoryDetail({ memory, onClose, onEdit, onDelete }: MemoryDetail
               <h3>Tags</h3>
               <div className="tag-list">
                 {memory.tags.map((tag, index) => (
-                  <span key={index} className="tag">
+                  <span
+                    key={index}
+                    className={`tag${onTagClick ? ' clickable-tag' : ''}`}
+                    onClick={() => onTagClick?.(tag)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') onTagClick?.(tag); }}
+                  >
                     {tag}
                   </span>
                 ))}

@@ -14,6 +14,7 @@ interface MemoryListProps {
   onMemoryDelete?: (memory: Memory) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  onTagClick?: (tag: string) => void;
 }
 
 export function MemoryList({
@@ -25,6 +26,7 @@ export function MemoryList({
   onMemoryDelete,
   onLoadMore,
   hasMore = false,
+  onTagClick,
 }: MemoryListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -99,6 +101,7 @@ export function MemoryList({
               onClick={() => onMemoryClick?.(memory)}
               onEdit={() => onMemoryEdit?.(memory)}
               onDelete={() => handleDelete(memory)}
+              onTagClick={onTagClick}
             />
             {deletingId === memory.id && (
               <div className="delete-overlay">

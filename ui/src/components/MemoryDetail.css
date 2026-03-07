@@ -154,6 +154,18 @@
   border-radius: var(--border-radius-sm);
   font-size: 13px;
   font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tag.clickable-tag {
+  cursor: pointer;
+}
+
+.tag.clickable-tag:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .memory-metadata {

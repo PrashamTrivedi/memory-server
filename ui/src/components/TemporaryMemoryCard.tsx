@@ -6,9 +6,10 @@ interface TemporaryMemoryCardProps {
   onClick?: () => void;
   onPromote?: () => void;
   isPromoting?: boolean;
+  onTagClick?: (tag: string) => void;
 }
 
-export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }: TemporaryMemoryCardProps) {
+export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting, onTagClick }: TemporaryMemoryCardProps) {
   // Defensive defaults for missing lifecycle data
   const accessCount = memory.access_count ?? 0;
   const stage = memory.stage ?? 1;
@@ -124,7 +125,14 @@ export function TemporaryMemoryCard({ memory, onClick, onPromote, isPromoting }:
       {memory.tags && memory.tags.length > 0 && (
         <div className="temp-memory-card-tags">
           {memory.tags.slice(0, 3).map((tag, index) => (
-            <span key={index} className="memory-tag">
+            <span
+              key={index}
+              className={`memory-tag${onTagClick ? ' clickable-tag' : ''}`}
+              onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onTagClick?.(tag); } }}
+            >
               {tag}
             </span>
           ))}

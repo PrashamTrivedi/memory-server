@@ -175,6 +175,10 @@
   transition: left 0.4s;
 }
 
+.memory-tag.clickable-tag {
+  cursor: pointer;
+}
+
 .memory-tag:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
