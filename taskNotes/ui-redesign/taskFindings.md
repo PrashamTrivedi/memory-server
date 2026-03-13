@@ -121,7 +121,9 @@ All existing `.css` files in `ui/src/` will be replaced by Tailwind utility clas
 10. **Inline Editor** (`components/InlineEditor.tsx`)
     - Double-click or `E` key activates
     - Textarea replaces rendered content in-place
-    - Esc or click outside saves and returns to read view
+    - Explicit Save button (or Cmd+Enter) to persist changes
+    - Esc discards unsaved changes and returns to read view
+    - Click outside also discards and returns to read view
     - Name, content, tags, URL all editable
 
 ### Phase 5: Search + Command Palette
@@ -146,7 +148,9 @@ All existing `.css` files in `ui/src/` will be replaced by Tailwind utility clas
     - On link hover in rendered markdown (300ms delay)
     - Shows page title, description, favicon from OG data
     - Data pre-cached via `CACHE_KV` (backend already has `update_url_content`)
-    - Graceful fallback if no cache data
+    - If no cache data: show a "Refresh" button that triggers a fetch and stores in cache
+    - After refresh, data is available on next hover (not shown inline immediately — avoids layout shift)
+    - Skeleton/placeholder shown while no data and no refresh clicked
 
 ### Phase 7: Temporary Memories Integration
 
@@ -196,7 +200,7 @@ One optional enhancement: add a `memory_count` field to the tag tree API respons
 1. Sidebar shows full tag hierarchy tree, clickable to filter memories, collapsible
 2. Memory list shows in both list (compact rows) and card (grid) view modes
 3. Clicking a memory opens a side peek panel with rendered markdown content
-4. Double-click or `E` key activates inline editor; Esc saves and returns to read view
+4. Double-click or `E` key activates inline editor; Cmd+Enter saves, Esc discards and returns to read view
 5. Cmd+K opens command palette with fuzzy search and quick actions
 6. Tag pills on hover show preview popover with memory count and top 5 memories
 7. Temporary memories appear in same views with lifecycle badges and promote actions
@@ -213,7 +217,7 @@ One optional enhancement: add a `memory_count` field to the tag tree API respons
 1. **Sidebar Navigation**: Click tags in sidebar → verify memory list filters. Expand/collapse tag groups. Multi-select tags → verify AND filtering.
 2. **View Modes**: Toggle list ↔ card view. Verify data consistency. Refresh page → verify mode persists.
 3. **Peek Panel**: Click memory → panel slides in. Verify rendered markdown. Press Esc → panel closes. Verify list stays visible behind panel.
-4. **Inline Edit**: Double-click content → verify editor appears. Edit → press Esc → verify saved. Press `E` key → verify editor activates.
+4. **Inline Edit**: Double-click content → verify editor appears. Edit → Cmd+Enter → verify saved. Edit → press Esc → verify changes discarded. Press `E` key → verify editor activates.
 5. **Command Palette**: Press Cmd+K → verify palette opens. Type query → verify fuzzy search. Arrow keys → verify navigation. Enter → verify action executes.
 6. **Tag Hover Preview**: Hover tag pill → verify popover after delay. Verify memory count and mini-list. Click "View all" → verify filter applied.
 7. **Temporary Memories**: Verify badges show in list. Promote from peek panel. Filter temporary/permanent.
