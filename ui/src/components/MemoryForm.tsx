@@ -1,255 +1,94 @@
-import { useState, useEffect } from 'react';
-import { Memory, CreateMemoryRequest, UpdateMemoryRequest } from '../types/memory';
-import { TagSelector } from './TagSelector';
-import { HierarchicalTagInput } from './HierarchicalTagInput';
-import { LoadingSpinner } from './LoadingSpinner';
-import './MemoryForm.css';
+import { useState } from 'react';
+import { CreateMemoryRequest } from '../types/memory';
 
 interface MemoryFormProps {
-  memory?: Memory;
-  onSubmit: (data: CreateMemoryRequest | UpdateMemoryRequest) => Promise<void>;
+  onSubmit: (data: CreateMemoryRequest) => Promise<void>;
   onCancel: () => void;
-  isSubmitting?: boolean;
+  isLoading: boolean;
 }
 
-export function MemoryForm({ memory, onSubmit, onCancel, isSubmitting = false }: MemoryFormProps) {
-  const [formData, setFormData] = useState({
-    name: memory?.name || '',
-    content: memory?.content || '',
-    url: memory?.url || '',
-    tags: memory?.tags || [],
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [tagInputMode, setTagInputMode] = useState<'simple' | 'hierarchical'>('simple');
-
-  useEffect(() => {
-    if (memory) {
-      setFormData({
-        name: memory.name,
-        content: memory.content,
-        url: memory.url || '',
-        tags: memory.tags || [],
-      });
-    }
-  }, [memory]);
-
-  const validateHierarchicalTags = (tags: string[]): string[] => {
-    const tagErrors: string[] = [];
-    
-    for (const tag of tags) {
-      if (tag.includes('>')) {
-        const parts = tag.split('>');
-        if (parts.length !== 2) {
-          tagErrors.push(`Invalid hierarchical tag format: "${tag}". Use "parent>child" format.`);
-        } else if (parts.some(part => !part.trim())) {
-          tagErrors.push(`Empty parent or child in: "${tag}". Both parent and child names are required.`);
-        } else if (parts[0].trim() === parts[1].trim()) {
-          tagErrors.push(`A tag cannot be its own parent: "${tag}"`);
-        }
-      }
-    }
-    
-    return tagErrors;
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
-    if (!formData.content.trim()) {
-      newErrors.content = 'Content is required';
-    }
-
-    if (formData.url && formData.url.trim()) {
-      try {
-        new URL(formData.url);
-      } catch {
-        newErrors.url = 'Please enter a valid URL';
-      }
-    }
-
-    // Validate hierarchical tags
-    if (formData.tags.length > 0) {
-      const tagValidationErrors = validateHierarchicalTags(formData.tags);
-      if (tagValidationErrors.length > 0) {
-        newErrors.tags = tagValidationErrors.join(' ');
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+export function MemoryForm({ onSubmit, onCancel, isLoading }: MemoryFormProps) {
+  const [name, setName] = useState('');
+  const [content, setContent] = useState('');
+  const [tags, setTags] = useState('');
+  const [url, setUrl] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    try {
-      const submitData = {
-        name: formData.name.trim(),
-        content: formData.content.trim(),
-        url: formData.url.trim() || undefined,
-        tags: formData.tags.length > 0 ? formData.tags : undefined,
-      };
-
-      await onSubmit(submitData);
-    } catch (error) {
-      console.error('Form submission error:', error);
-      setErrors({ form: 'Failed to save memory. Please try again.' });
-    }
-  };
-
-  const handleInputChange = (field: keyof typeof formData, value: string | string[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear field error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+    const parsedTags = tags.split(',').map(t => t.trim()).filter(Boolean);
+    await onSubmit({
+      name,
+      content,
+      url: url || undefined,
+      tags: parsedTags.length > 0 ? parsedTags : undefined,
+    });
   };
 
   return (
-    <div className="memory-form-container">
-      <form onSubmit={handleSubmit} className="memory-form">
-        <div className="form-header">
-          <h2>{memory ? 'Edit Memory' : 'Create New Memory'}</h2>
-        </div>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm animate-fade-in"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Create Memory</h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
 
-        {errors.form && (
-          <div className="form-error">
-            {errors.form}
-          </div>
-        )}
+      <div className="space-y-3">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Memory name"
+          required
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="Content (markdown supported)"
+          required
+          rows={6}
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary-500 resize-y leading-relaxed"
+        />
+        <input
+          type="text"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="Tags (comma separated)"
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Reference URL (optional)"
+          className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+        />
+      </div>
 
-        <div className="form-group">
-          <label htmlFor="name" className="form-label">
-            Name *
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            className={`form-input ${errors.name ? 'error' : ''}`}
-            placeholder="Enter memory name"
-            disabled={isSubmitting}
-          />
-          {errors.name && (
-            <div className="field-error">{errors.name}</div>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="content" className="form-label">
-            Content *
-          </label>
-          <textarea
-            id="content"
-            value={formData.content}
-            onChange={(e) => handleInputChange('content', e.target.value)}
-            className={`form-textarea ${errors.content ? 'error' : ''}`}
-            placeholder="Enter memory content..."
-            rows={8}
-            disabled={isSubmitting}
-          />
-          {errors.content && (
-            <div className="field-error">{errors.content}</div>
-          )}
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="url" className="form-label">
-            URL (optional)
-          </label>
-          <input
-            type="url"
-            id="url"
-            value={formData.url}
-            onChange={(e) => handleInputChange('url', e.target.value)}
-            className={`form-input ${errors.url ? 'error' : ''}`}
-            placeholder="https://example.com"
-            disabled={isSubmitting}
-          />
-          {errors.url && (
-            <div className="field-error">{errors.url}</div>
-          )}
-        </div>
-
-        <div className="form-group">
-          <div className="tags-header">
-            <label className="form-label">
-              Tags
-            </label>
-            <div className="tag-mode-toggle">
-              <button
-                type="button"
-                className={`toggle-btn ${tagInputMode === 'simple' ? 'active' : ''}`}
-                onClick={() => setTagInputMode('simple')}
-                disabled={isSubmitting}
-              >
-                Simple
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn ${tagInputMode === 'hierarchical' ? 'active' : ''}`}
-                onClick={() => setTagInputMode('hierarchical')}
-                disabled={isSubmitting}
-              >
-                Hierarchical
-              </button>
-            </div>
-          </div>
-          
-          {tagInputMode === 'simple' ? (
-            <TagSelector
-              selectedTags={formData.tags}
-              onTagsChange={(tags) => handleInputChange('tags', tags)}
-              disabled={isSubmitting}
-            />
-          ) : (
-            <HierarchicalTagInput
-              selectedTags={formData.tags}
-              onTagsChange={(tags) => handleInputChange('tags', tags)}
-              disabled={isSubmitting}
-            />
-          )}
-          
-          {errors.tags && (
-            <div className="field-error">{errors.tags}</div>
-          )}
-        </div>
-
-        <div className="form-actions">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn-secondary"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <LoadingSpinner size="small" />
-                {memory ? 'Updating...' : 'Creating...'}
-              </>
-            ) : (
-              memory ? 'Update Memory' : 'Create Memory'
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isLoading || !name.trim() || !content.trim()}
+          className="px-4 py-2 text-sm rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 font-medium"
+        >
+          {isLoading ? 'Creating...' : 'Create Memory'}
+        </button>
+      </div>
+    </form>
   );
 }

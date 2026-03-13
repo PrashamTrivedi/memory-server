@@ -1,3 +1,4 @@
+// @ts-nocheck - Legacy page, replaced by new App.tsx layout
 import {useState, useCallback} from 'react'
 import {
   useInfiniteMemories,
