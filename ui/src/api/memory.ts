@@ -134,7 +134,7 @@ export function useSearchMemories(request: SearchMemoryRequest) {
   return useQuery({
     queryKey: ['memories', 'search', request],
     queryFn: () => memoryApi.searchMemories(request),
-    enabled: !!request.query.trim(),
+    enabled: !!request.query.trim() || (!!request.tags && request.tags.length > 0),
   })
 }
 

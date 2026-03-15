@@ -162,73 +162,85 @@ export function TagManagement() {
   };
 
   const renderTreeTab = () => (
-    <div className="tab-content">
-      <div className="tree-section">
-        <TagTree />
-      </div>
+    <div>
+      <TagTree />
     </div>
   );
 
   const renderRelationshipsTab = () => (
-    <div className="tab-content">
-      <div className="relationships-section">
-        <h3>Manage Parent-Child Relationships</h3>
-        
-        <div className="relationship-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label>Child Tag:</label>
-              <SingleTagSelector
-                selectedTag={state.selectedChildId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id || null }))}
-                placeholder="Select child tag..."
-              />
-            </div>
-            
-            <div className="form-group">
-              <label>Parent Tag:</label>
-              <SingleTagSelector
-                selectedTag={state.selectedParentId || undefined}
-                onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
-                placeholder="Select parent tag..."
-              />
-            </div>
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-6">
+        <h3
+          className="text-base font-bold text-slate-900 dark:text-slate-100 mb-5 tracking-tight"
+          style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+        >
+          Manage Parent-Child Relationships
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Child Tag
+            </label>
+            <SingleTagSelector
+              selectedTag={state.selectedChildId || undefined}
+              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedChildId: id || null }))}
+              placeholder="Select child tag..."
+            />
           </div>
 
-          <div className="relationship-actions">
-            <button
-              onClick={handleAddParentRelationship}
-              disabled={!state.selectedChildId || !state.selectedParentId || loading}
-              className="add-relationship-button"
-            >
-              Add Parent Relationship
-            </button>
-            
-            <button
-              onClick={handleRemoveParentRelationship}
-              disabled={!state.selectedChildId || !state.selectedParentId || loading}
-              className="remove-relationship-button"
-            >
-              Remove Parent Relationship
-            </button>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Parent Tag
+            </label>
+            <SingleTagSelector
+              selectedTag={state.selectedParentId || undefined}
+              onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
+              placeholder="Select parent tag..."
+            />
           </div>
         </div>
 
-        {state.selectedChildId && (
-          <TagRelationshipViewer tagId={state.selectedChildId} />
-        )}
+        <div className="flex gap-3">
+          <button
+            onClick={handleAddParentRelationship}
+            disabled={!state.selectedChildId || !state.selectedParentId || loading}
+            className="px-4 py-2 text-sm rounded-xl bg-primary-500 text-white hover:bg-primary-600 font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Add Parent Relationship
+          </button>
+
+          <button
+            onClick={handleRemoveParentRelationship}
+            disabled={!state.selectedChildId || !state.selectedParentId || loading}
+            className="px-4 py-2 text-sm rounded-xl bg-red-500 text-white hover:bg-red-600 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Remove Parent Relationship
+          </button>
+        </div>
       </div>
+
+      {state.selectedChildId && (
+        <TagRelationshipViewer tagId={state.selectedChildId} />
+      )}
     </div>
   );
 
   const renderBulkTab = () => (
-    <div className="tab-content">
-      <div className="bulk-section">
-        <h3>Bulk Parent Assignment</h3>
-        
-        <div className="bulk-form">
-          <div className="form-group">
-            <label>Parent Tag:</label>
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-6">
+        <h3
+          className="text-base font-bold text-slate-900 dark:text-slate-100 mb-5 tracking-tight"
+          style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+        >
+          Bulk Parent Assignment
+        </h3>
+
+        <div className="space-y-5 mb-5">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Parent Tag
+            </label>
             <SingleTagSelector
               selectedTag={state.selectedParentId || undefined}
               onSelectionChange={(id) => setState(prev => ({ ...prev, selectedParentId: id || null }))}
@@ -236,8 +248,10 @@ export function TagManagement() {
             />
           </div>
 
-          <div className="form-group">
-            <label>Child Tags:</label>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Child Tags
+            </label>
             <TagSelector
               selectedTags={state.bulkChildIds}
               onSelectionChange={(ids) => setState(prev => ({ ...prev, bulkChildIds: ids }))}
@@ -245,106 +259,123 @@ export function TagManagement() {
               multiSelect={true}
             />
           </div>
-
-          <div className="bulk-actions">
-            <button
-              onClick={handleBulkAddParent}
-              disabled={!state.selectedParentId || state.bulkChildIds.length === 0 || loading}
-              className="bulk-add-button"
-            >
-              Add Parent to {state.bulkChildIds.length} Tags
-            </button>
-            
-            <button
-              onClick={() => setState(prev => ({ ...prev, bulkChildIds: [], selectedParentId: null }))}
-              className="clear-selection-button"
-            >
-              Clear Selection
-            </button>
-          </div>
         </div>
 
-        <div className="bulk-warning">
-          <p><strong>Warning:</strong> Bulk operations cannot be easily undone. Please verify your selection before proceeding.</p>
-          <p>This will attempt to add the selected parent to all selected child tags. Individual failures will be reported.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={handleBulkAddParent}
+            disabled={!state.selectedParentId || state.bulkChildIds.length === 0 || loading}
+            className="px-4 py-2 text-sm rounded-xl bg-primary-500 text-white hover:bg-primary-600 font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Add Parent to {state.bulkChildIds.length} Tags
+          </button>
+
+          <button
+            onClick={() => setState(prev => ({ ...prev, bulkChildIds: [], selectedParentId: null }))}
+            className="px-4 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+          >
+            Clear Selection
+          </button>
         </div>
+      </div>
+
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 rounded-xl p-4 text-sm">
+        <p className="font-semibold mb-1">Warning</p>
+        <p>Bulk operations cannot be easily undone. Please verify your selection before proceeding. This will attempt to add the selected parent to all selected child tags. Individual failures will be reported.</p>
       </div>
     </div>
   );
 
   const renderCreateTab = () => (
-    <div className="tab-content">
-      <div className="create-section">
-        <CreateTagForm
-          onSuccess={showOperationResult}
-          onError={showOperationError}
-        />
-      </div>
+    <div>
+      <CreateTagForm
+        onSuccess={showOperationResult}
+        onError={showOperationError}
+      />
     </div>
   );
 
   return (
-    <div className="tag-management-page">
-      <div className="page-header">
-        <h1>Tag Hierarchy Management</h1>
-        <p>Manage tag relationships, view hierarchies, and perform bulk operations</p>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Sticky header */}
+      <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 shrink-0">
+        <h1
+          className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1 tracking-tight"
+          style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+        >
+          Tag Hierarchy Management
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Manage tag relationships, view hierarchies, and perform bulk operations
+        </p>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mt-4">
+          <TabButton active={state.activeTab === 'tree'} onClick={() => handleTabChange('tree')}>
+            Tree View
+          </TabButton>
+          <TabButton active={state.activeTab === 'create'} onClick={() => handleTabChange('create')}>
+            Create Tags
+          </TabButton>
+          <TabButton active={state.activeTab === 'relationships'} onClick={() => handleTabChange('relationships')}>
+            Relationships
+          </TabButton>
+          <TabButton active={state.activeTab === 'bulk'} onClick={() => handleTabChange('bulk')}>
+            Bulk Operations
+          </TabButton>
+        </div>
       </div>
 
-      <div className="tabs">
-        <button
-          className={`tab ${state.activeTab === 'tree' ? 'active' : ''}`}
-          onClick={() => handleTabChange('tree')}
-        >
-          Tree View
-        </button>
-        <button
-          className={`tab ${state.activeTab === 'create' ? 'active' : ''}`}
-          onClick={() => handleTabChange('create')}
-        >
-          Create Tags
-        </button>
-        <button
-          className={`tab ${state.activeTab === 'relationships' ? 'active' : ''}`}
-          onClick={() => handleTabChange('relationships')}
-        >
-          Relationships
-        </button>
-        <button
-          className={`tab ${state.activeTab === 'bulk' ? 'active' : ''}`}
-          onClick={() => handleTabChange('bulk')}
-        >
-          Bulk Operations
-        </button>
-      </div>
+      {/* Content area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Operation Messages (toast-style) */}
+        {state.operationResult && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 rounded-xl p-4 text-sm whitespace-pre-wrap">
+            {state.operationResult}
+          </div>
+        )}
 
-      {/* Operation Messages */}
-      {state.operationResult && (
-        <div className="operation-message success">
-          {state.operationResult}
-        </div>
-      )}
-      
-      {state.operationError && (
-        <div className="operation-message error">
-          {state.operationError}
-        </div>
-      )}
+        {state.operationError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl p-4 text-sm whitespace-pre-wrap">
+            {state.operationError}
+          </div>
+        )}
 
-      {/* Global Error */}
-      {error && (
-        <div className="global-error">
-          <span>{error}</span>
-          <button onClick={clearError}>×</button>
-        </div>
-      )}
+        {/* Global Error */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl p-4 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={clearError}
+              className="ml-3 text-red-400 hover:text-red-600 dark:hover:text-red-200 font-bold text-lg leading-none"
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
-      <div className="tab-container">
+        {/* Tab content */}
         {state.activeTab === 'tree' && renderTreeTab()}
         {state.activeTab === 'create' && renderCreateTab()}
         {state.activeTab === 'relationships' && renderRelationshipsTab()}
         {state.activeTab === 'bulk' && renderBulkTab()}
       </div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+        active
+          ? 'bg-primary-50 dark:bg-primary-900/25 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800/50'
+          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -360,9 +391,9 @@ export function TagRelationshipViewer({ tagId }: TagRelationshipViewerProps) {
   const [descendants, setDescendants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { getAncestors, getDescendants, findNode } = useTagHierarchy();
-  
+
   const tagNode = findNode(tagId);
 
   React.useEffect(() => {
@@ -375,7 +406,7 @@ export function TagRelationshipViewer({ tagId }: TagRelationshipViewerProps) {
           getAncestors(tagId),
           getDescendants(tagId)
         ]);
-        
+
         setAncestors(ancestorData);
         setDescendants(descendantData);
       } catch (err) {
@@ -390,8 +421,8 @@ export function TagRelationshipViewer({ tagId }: TagRelationshipViewerProps) {
 
   if (loading) {
     return (
-      <div className="relationship-viewer loading">
-        <div className="mini-spinner"></div>
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-6 flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+        <div className="w-4 h-4 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
         <span>Loading relationships...</span>
       </div>
     );
@@ -399,41 +430,62 @@ export function TagRelationshipViewer({ tagId }: TagRelationshipViewerProps) {
 
   if (error) {
     return (
-      <div className="relationship-viewer error">
-        <span>Error: {error}</span>
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl p-4 text-sm">
+        Error: {error}
       </div>
     );
   }
 
   return (
-    <div className="relationship-viewer">
-      <h4>Relationships for "{tagNode?.name}" (ID: {tagId})</h4>
-      
-      <div className="relationships-grid">
-        <div className="relationship-column">
-          <h5>Ancestors ({ancestors.length})</h5>
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm p-6">
+      <h4
+        className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4 tracking-tight"
+        style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+      >
+        Relationships for "{tagNode?.name}" (ID: {tagId})
+      </h4>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            Ancestors ({ancestors.length})
+          </h5>
           {ancestors.length === 0 ? (
-            <p className="no-relationships">No ancestor tags</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 italic">No ancestor tags</p>
           ) : (
-            <ul className="relationship-list">
+            <ul className="space-y-1">
               {ancestors.map(ancestor => (
-                <li key={ancestor.id}>
-                  {ancestor.name} (ID: {ancestor.id})
+                <li
+                  key={ancestor.id}
+                  className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg"
+                >
+                  {ancestor.name}
+                  <span className="text-slate-400 dark:text-slate-500 ml-1.5 text-xs">
+                    ID: {ancestor.id}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
         </div>
 
-        <div className="relationship-column">
-          <h5>Descendants ({descendants.length})</h5>
+        <div>
+          <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            Descendants ({descendants.length})
+          </h5>
           {descendants.length === 0 ? (
-            <p className="no-relationships">No descendant tags</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 italic">No descendant tags</p>
           ) : (
-            <ul className="relationship-list">
+            <ul className="space-y-1">
               {descendants.map(descendant => (
-                <li key={descendant.id}>
-                  {descendant.name} (ID: {descendant.id})
+                <li
+                  key={descendant.id}
+                  className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg"
+                >
+                  {descendant.name}
+                  <span className="text-slate-400 dark:text-slate-500 ml-1.5 text-xs">
+                    ID: {descendant.id}
+                  </span>
                 </li>
               ))}
             </ul>

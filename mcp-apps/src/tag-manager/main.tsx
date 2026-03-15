@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import { App } from '@modelcontextprotocol/ext-apps';
+import { App, applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from '@modelcontextprotocol/ext-apps';
 import '../shared/styles/base.css';
 
 interface Tag {
@@ -29,17 +29,33 @@ interface MemoriesData {
   memories: Memory[];
 }
 
-function parseToolResult<T>(result: unknown): T | null {
-  if (!result || typeof result !== 'object') return null;
-  const typedResult = result as { content?: Array<{ type: string; text?: string }> };
-  const textContent = typedResult.content?.find((c) => c.type === 'text');
-  if (!textContent?.text) return null;
-  try {
-    const data = JSON.parse(textContent.text);
-    return data.success ? data.data : null;
-  } catch {
-    return null;
+function parseToolResult<T>(params: unknown): T | null {
+  if (!params || typeof params !== 'object') return null;
+
+  const typedParams = params as {
+    content?: Array<{ type: string; text?: string; mimeType?: string }>;
+    result?: { content?: Array<{ type: string; text?: string; mimeType?: string }> };
+    isError?: boolean;
+  };
+
+  if (typedParams.isError) return null;
+
+  const content = typedParams.content || typedParams.result?.content;
+  if (!content) return null;
+
+  // Claude.ai strips mimeType, so find JSON by content pattern
+  for (const item of content) {
+    if (item.type !== 'text' || !item.text) continue;
+    const text = item.text.trim();
+    if (!text.startsWith('{') && !text.startsWith('[')) continue;
+    try {
+      const data = JSON.parse(text);
+      return data.success ? data.data : data;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 function buildTree(tags: Tag[]): TagTreeNode[] {
@@ -76,6 +92,7 @@ function buildTree(tags: Tag[]): TagTreeNode[] {
 function TagManager() {
   const [app, setApp] = useState<App | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [tree, setTree] = useState<TagTreeNode[]>([]);
   const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
@@ -88,14 +105,24 @@ function TagManager() {
   useEffect(() => {
     const mcpApp = new App({ name: 'tag-manager', version: '1.0.0' });
 
-    mcpApp.ontoolresult = (event) => {
-      const tagsData = parseToolResult<TagsData>(event.result);
+    // Register ALL handlers BEFORE connect()
+
+    // Handle tool input (when tool execution begins)
+    mcpApp.ontoolinput = (params) => {
+      console.log('[tag-manager] ontoolinput:', params);
+      setLoading(true);
+    };
+
+    // Handle tool result (when tool execution completes)
+    mcpApp.ontoolresult = (params) => {
+      console.log('[tag-manager] ontoolresult:', params);
+      const tagsData = parseToolResult<TagsData>(params);
       if (tagsData?.tags) {
         setTags(tagsData.tags);
         setTree(buildTree(tagsData.tags));
       }
 
-      const memoriesData = parseToolResult<MemoriesData>(event.result);
+      const memoriesData = parseToolResult<MemoriesData>(params);
       if (memoriesData?.memories) {
         setMemories(memoriesData.memories);
       }
@@ -103,9 +130,38 @@ function TagManager() {
       setLoading(false);
     };
 
-    mcpApp.connect();
-    setApp(mcpApp);
-    setConnected(true);
+    // Handle host context changes (theme, styling)
+    mcpApp.onhostcontextchanged = (ctx) => {
+      console.log('[tag-manager] onhostcontextchanged:', ctx);
+      if (ctx.theme) applyDocumentTheme(ctx.theme);
+      if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+      if (ctx.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
+      if (ctx.safeAreaInsets) {
+        const { top, right, bottom, left } = ctx.safeAreaInsets;
+        document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
+      }
+    };
+
+    // Handle teardown
+    mcpApp.onteardown = async () => {
+      console.log('[tag-manager] onteardown');
+      return {};
+    };
+
+    // Now connect
+    (async () => {
+      try {
+        await mcpApp.connect();
+        setApp(mcpApp);
+        setConnected(true);
+        setConnectionError(null);
+        console.log('[tag-manager] Connected successfully');
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error('[tag-manager] Connection failed:', errMsg);
+        setConnectionError(errMsg);
+      }
+    })();
   }, []);
 
   const loadTags = async () => {
@@ -152,7 +208,21 @@ function TagManager() {
   if (!connected) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">Connecting...</div>
+        <div className="text-center p-4">
+          {connectionError ? (
+            <>
+              <div className="text-red-500 font-medium mb-2">Connection Failed</div>
+              <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-sm">
+                {connectionError}
+              </div>
+              <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-xs mt-4">
+                MCP Apps require a host that supports the MCP Apps extension.
+              </div>
+            </>
+          ) : (
+            <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary">Connecting...</div>
+          )}
+        </div>
       </div>
     );
   }
@@ -160,31 +230,31 @@ function TagManager() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-        <h1 className="text-lg font-bold">Tag Manager</h1>
+      <div className="p-4 border-b border-claude-border dark:border-claude-dark-border flex items-center gap-3 bg-white dark:bg-claude-dark-card">
+        <h1 className="text-xl font-semibold text-claude-text dark:text-claude-dark-text">Tag Manager</h1>
         <button
           onClick={loadTags}
           disabled={loading}
-          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary text-sm"
         >
           {loading ? 'Loading...' : 'Load Tags'}
         </button>
         <button
           onClick={() => setShowMergeDialog(true)}
           disabled={tags.length < 2}
-          className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+          className="btn-secondary text-sm"
         >
           Merge Tags
         </button>
-        <span className="text-sm text-gray-500 ml-auto">{tags.length} tags</span>
+        <span className="text-sm text-claude-text-secondary dark:text-claude-dark-text-secondary ml-auto">{tags.length} tags</span>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Tag Tree Panel */}
-        <div className="w-1/2 border-r border-gray-200 dark:border-gray-700 overflow-auto p-4">
+        <div className="w-1/2 border-r border-claude-border dark:border-claude-dark-border overflow-auto p-4">
           {tree.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">
+            <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-center py-12">
               No tags found.
               <br />
               Click "Load Tags" to fetch tags.
@@ -208,20 +278,17 @@ function TagManager() {
         <div className="w-1/2 overflow-auto p-4">
           {selectedTag ? (
             <>
-              <h2 className="text-lg font-semibold mb-4">
+              <h2 className="text-lg font-semibold text-claude-text dark:text-claude-dark-text mb-4">
                 Memories tagged "{selectedTag.name}" ({memories.length})
               </h2>
               {memories.length === 0 ? (
-                <div className="text-gray-500">No memories with this tag.</div>
+                <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary">No memories with this tag.</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {memories.map((memory) => (
-                    <div
-                      key={memory.id}
-                      className="p-3 border border-gray-200 dark:border-gray-700 rounded"
-                    >
-                      <h3 className="font-medium">{memory.name}</h3>
-                      <p className="text-sm text-gray-500 truncate">
+                    <div key={memory.id} className="card p-4">
+                      <h3 className="font-medium text-claude-text dark:text-claude-dark-text">{memory.name}</h3>
+                      <p className="text-sm text-claude-text-secondary dark:text-claude-dark-text-secondary truncate mt-1">
                         {memory.content.slice(0, 100)}
                         {memory.content.length > 100 && '...'}
                       </p>
@@ -231,7 +298,7 @@ function TagManager() {
               )}
             </>
           ) : (
-            <div className="text-gray-500 text-center py-8">
+            <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-center py-12">
               Select a tag to view its memories
             </div>
           )}
@@ -277,19 +344,19 @@ function TagTree({
   depth = 0
 }: TagTreeProps) {
   return (
-    <ul className={depth > 0 ? 'ml-4 border-l border-gray-300 dark:border-gray-600 pl-2' : ''}>
+    <ul className={depth > 0 ? 'ml-4 border-l border-claude-border dark:border-claude-dark-border pl-3' : ''}>
       {nodes.map((node) => (
         <li key={node.id} className="py-1">
           <div
-            className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-2 rounded-claude cursor-pointer transition-colors ${
               selectedTag?.id === node.id
-                ? 'bg-blue-100 dark:bg-blue-900'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                ? 'bg-claude-coral-light dark:bg-claude-coral/20 text-claude-coral'
+                : 'hover:bg-claude-beige dark:hover:bg-claude-dark-card text-claude-text dark:text-claude-dark-text'
             }`}
             onClick={() => onSelect(node)}
           >
             {node.children.length > 0 && (
-              <span className="text-gray-400 text-xs">▼</span>
+              <span className="text-claude-text-secondary text-xs">▼</span>
             )}
             {editingTag === node.id ? (
               <input

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { listMcpApps, uploadMcpApp, deleteMcpApp, McpAppInfo } from '../api/mcpApps';
-import './McpAppsAdmin.css';
 
 export function McpAppsAdmin() {
   const [apps, setApps] = useState<McpAppInfo[]>([]);
@@ -153,9 +152,9 @@ export function McpAppsAdmin() {
 
   if (loading) {
     return (
-      <div className="loading-state">
-        <div className="spinner"></div>
-        <span style={{ marginLeft: '1rem' }}>Loading MCP apps...</span>
+      <div className="flex items-center justify-center py-20 text-slate-500">
+        <div className="w-5 h-5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+        <span className="ml-4 text-sm font-medium">Loading MCP apps...</span>
       </div>
     );
   }
@@ -163,72 +162,115 @@ export function McpAppsAdmin() {
   const deployedCount = apps.filter(a => a.deployed).length;
 
   return (
-    <div className="mcp-apps-page">
-      <div className="mcp-apps-header">
-        <div className="mcp-apps-header-top">
-          <h1>MCP Apps Management</h1>
-        </div>
+    <div className="max-w-[1400px] mx-auto px-6 py-8 sm:px-4 sm:py-6">
+      {/* Header */}
+      <div className="mb-10">
+        <h1
+          className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-6"
+          style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+        >
+          MCP Apps Management
+        </h1>
 
-        <div className="mcp-apps-stats">
-          <div className="mcp-app-stat">
-            <span className="mcp-app-stat-value">{apps.length}</span>
-            <span className="mcp-app-stat-label">Total Apps</span>
+        {/* Stats row */}
+        <div className="flex gap-8">
+          <div className="text-center">
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 block">
+              {apps.length}
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Total Apps
+            </span>
           </div>
-          <div className="mcp-app-stat">
-            <span className="mcp-app-stat-value">{deployedCount}</span>
-            <span className="mcp-app-stat-label">Deployed</span>
+          <div className="text-center">
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 block">
+              {deployedCount}
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Deployed
+            </span>
           </div>
-          <div className="mcp-app-stat">
-            <span className="mcp-app-stat-value">{apps.length - deployedCount}</span>
-            <span className="mcp-app-stat-label">Not Deployed</span>
+          <div className="text-center">
+            <span className="text-2xl font-bold text-slate-900 dark:text-slate-100 block">
+              {apps.length - deployedCount}
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Not Deployed
+            </span>
           </div>
         </div>
       </div>
 
+      {/* Error */}
       {error && (
-        <div className="mcp-apps-error">
+        <div className="mb-6 px-5 py-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 text-sm font-medium">
           {error}
         </div>
       )}
 
-      <div className="app-cards-grid">
+      {/* App Cards Grid */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5 mb-8">
         {apps.map((app) => (
-          <div key={app.name} className={`app-card ${app.deployed ? 'deployed' : 'not-deployed'}`}>
-            <div className="app-card-header">
-              <h3 className="app-card-name">{app.name}</h3>
-              <span className={`app-status-badge ${app.deployed ? 'deployed' : 'not-deployed'}`}>
+          <div
+            key={app.name}
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col transition-shadow hover:shadow-md"
+          >
+            {/* Accent bar */}
+            <div
+              className={app.deployed ? 'bg-green-500' : 'bg-amber-500'}
+              style={{ height: '3px' }}
+            />
+
+            {/* Card header */}
+            <div className="px-5 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {app.name}
+              </h3>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  app.deployed
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                    : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                }`}
+              >
                 {app.deployed ? 'Deployed' : 'Not Deployed'}
               </span>
             </div>
 
-            <div className="app-card-body">
+            {/* Card body */}
+            <div className="px-5 py-4 flex-1">
               {app.deployed ? (
-                <>
-                  <div className="app-card-info">
-                    <div className="app-info-row">
-                      <span className="app-info-label">Size</span>
-                      <span className="app-info-value">{formatSize(app.size)}</span>
-                    </div>
-                    <div className="app-info-row">
-                      <span className="app-info-label">Updated</span>
-                      <span className="app-info-value">{formatDate(app.updatedAt)}</span>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Size</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {formatSize(app.size)}
+                    </span>
                   </div>
-                </>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Updated</span>
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {formatDate(app.updatedAt)}
+                    </span>
+                  </div>
+                </div>
               ) : (
-                <p className="app-card-empty">No bundle deployed</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-3">
+                  No bundle deployed
+                </p>
               )}
             </div>
 
-            <div className="app-card-actions">
+            {/* Card actions */}
+            <div className="px-5 py-3 flex gap-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
               <button
-                className="app-action-btn upload"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white hover:bg-primary-600 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 onClick={() => handleFileSelect(app.name)}
                 disabled={uploading === app.name}
               >
                 {uploading === app.name ? (
                   <>
-                    <span className="spinner-small"></span>
+                    <span className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
                     Uploading...
                   </>
                 ) : (
@@ -244,7 +286,7 @@ export function McpAppsAdmin() {
               </button>
               {app.deployed && (
                 <button
-                  className="app-action-btn delete"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-sm font-semibold transition-colors"
                   onClick={() => handleDelete(app.name)}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -259,25 +301,47 @@ export function McpAppsAdmin() {
         ))}
       </div>
 
+      {/* Drop zone */}
       <div
         ref={dropZoneRef}
-        className={`drop-zone ${isDragging ? 'dragging' : ''}`}
+        className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${
+          isDragging
+            ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/10'
+            : 'border-slate-300 dark:border-slate-600 hover:border-primary-400'
+        }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="drop-zone-icon">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          className={`mx-auto mb-3 transition-colors ${
+            isDragging ? 'text-primary-500' : 'text-slate-400'
+          }`}
+        >
           <path d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M17 8L12 3L7 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           <path d="M12 3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
-        <p className="drop-zone-text">Drop HTML files here to upload</p>
-        <p className="drop-zone-hint">Files will be matched to apps by name</p>
+        <p className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">
+          Drop HTML files here to upload
+        </p>
+        <p className="text-sm text-slate-400 dark:text-slate-500">
+          Files will be matched to apps by name
+        </p>
       </div>
 
+      {/* Toast */}
       {showToast && (
-        <div className={`toast ${toastType}`}>
-          {toastType === 'success' ? '✓' : '✕'} {toastMessage}
+        <div
+          className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-sm font-medium z-50 text-white ${
+            toastType === 'success' ? 'bg-slate-900' : 'bg-red-600'
+          }`}
+        >
+          {toastType === 'success' ? '\u2713' : '\u2715'} {toastMessage}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import type { Env } from '../../index';
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 
 // MCP App configurations
 interface McpAppConfig {
@@ -77,7 +78,7 @@ export async function handleUiAppResource(env: Env, uri: string): Promise<any> {
       contents: [
         {
           uri,
-          mimeType: 'text/html',
+          mimeType: RESOURCE_MIME_TYPE,
           text: bundleHtml,
         }
       ]
@@ -96,7 +97,7 @@ export function listUiAppResources(): Resource[] {
     uri: app.uri,
     name: app.name,
     description: app.description,
-    mimeType: 'text/html',
+    mimeType: RESOURCE_MIME_TYPE,
   }));
 }
 
