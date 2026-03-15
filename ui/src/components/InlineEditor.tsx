@@ -19,7 +19,6 @@ export function InlineEditor({ memory, onSave, onDiscard, isSaving }: InlineEdit
     contentRef.current?.focus();
   }, []);
 
-  // Handle Cmd+Enter to save, Esc to discard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -41,23 +40,23 @@ export function InlineEditor({ memory, onSave, onDiscard, isSaving }: InlineEdit
   };
 
   return (
-    <div className="p-5 space-y-4">
+    <div className="p-6 space-y-4 max-w-3xl mx-auto">
       {/* Save/Discard bar */}
-      <div className="flex items-center justify-between bg-primary-50 dark:bg-primary-900/20 rounded-lg px-4 py-2 border border-primary-200 dark:border-primary-800">
-        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Editing</span>
+      <div className="flex items-center justify-between bg-primary-50 dark:bg-primary-900/15 rounded-xl px-4 py-2.5 border border-primary-200 dark:border-primary-800/50">
+        <span className="text-xs text-primary-700 dark:text-primary-400 font-bold uppercase tracking-wider">Editing</span>
         <div className="flex items-center gap-2">
           <button
             onClick={onDiscard}
-            className="px-3 py-1 text-xs rounded-md border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+            className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors font-medium"
           >
-            Discard <kbd className="ml-1 text-[10px] text-slate-400">Esc</kbd>
+            Discard <kbd className="ml-1 text-[10px] text-slate-400 font-mono">Esc</kbd>
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-3 py-1 text-xs rounded-md bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+            className="px-3 py-1.5 text-xs rounded-lg bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50 transition-colors font-semibold"
           >
-            {isSaving ? 'Saving...' : 'Save'} <kbd className="ml-1 text-[10px] text-primary-200">⌘↵</kbd>
+            {isSaving ? 'Saving...' : 'Save'} <kbd className="ml-1 text-[10px] text-primary-200 font-mono">&#8984;&#x21B5;</kbd>
           </button>
         </div>
       </div>
@@ -67,7 +66,8 @@ export function InlineEditor({ memory, onSave, onDiscard, isSaving }: InlineEdit
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full text-lg font-semibold bg-transparent border-b border-slate-200 dark:border-slate-700 focus:border-primary-500 focus:outline-none pb-1 text-slate-900 dark:text-slate-100"
+        className="w-full text-xl font-semibold bg-transparent border-b-2 border-slate-200 dark:border-slate-700 focus:border-primary-400 focus:outline-none pb-2 text-slate-900 dark:text-slate-100 tracking-tight"
+        style={{ fontFamily: "'Fraunces', Georgia, serif" }}
         placeholder="Memory name"
       />
 
@@ -76,30 +76,30 @@ export function InlineEditor({ memory, onSave, onDiscard, isSaving }: InlineEdit
         ref={contentRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        className="w-full min-h-[300px] bg-transparent border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-y leading-relaxed"
+        className="w-full min-h-[300px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 resize-y leading-relaxed transition-all"
         placeholder="Write markdown content..."
       />
 
       {/* Tags */}
       <div>
-        <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Tags (comma separated)</label>
+        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Tags (comma separated)</label>
         <input
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
-          className="w-full px-3 py-2 bg-transparent border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all"
           placeholder="tag1, tag2, parent>child"
         />
       </div>
 
       {/* URL */}
       <div>
-        <label className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 block">Reference URL</label>
+        <label className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-1.5 block">Reference URL</label>
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          className="w-full px-3 py-2 bg-transparent border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+          className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 transition-all"
           placeholder="https://..."
         />
       </div>

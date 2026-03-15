@@ -27,8 +27,8 @@ for app in "${APPS[@]}"; do
   if [ -f "$APP_FILE" ]; then
     echo "Deploying $app..."
 
-    # Upload to KV using wrangler
-    wrangler kv key put "mcp-app:$app" --path="$APP_FILE" --binding=MCP_APPS_KV
+    # Upload to KV using wrangler (--remote for production KV)
+    npx wrangler kv key put "mcp-app:$app" --path="$APP_FILE" --binding=MCP_APPS_KV --remote
 
     echo "  ✓ $app deployed"
   else

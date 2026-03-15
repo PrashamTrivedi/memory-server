@@ -61,4 +61,5 @@ gha-creds-*.json
 .ripgreprc
 .zprofile
 .zshrc
-.claude/
+.idea
+.vscode

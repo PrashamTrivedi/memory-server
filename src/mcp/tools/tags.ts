@@ -73,10 +73,10 @@ No tags found.`;
  */
 export async function handleListTags(env: Env): Promise<any> {
   const result = await env.DB.prepare(`
-    SELECT t.id, t.name, th.parent_id,
+    SELECT t.id, t.name, th.parent_tag_id as parent_id,
            (SELECT COUNT(*) FROM memory_tags WHERE tag_id = t.id) as memory_count
     FROM tags t
-    LEFT JOIN tag_hierarchy th ON t.id = th.child_id
+    LEFT JOIN tag_hierarchy th ON t.id = th.child_tag_id
     ORDER BY t.name
   `).all<TagWithMetadata>();
 
@@ -180,11 +180,11 @@ export async function handleMergeTags(
     .bind(sourceTagId).run();
 
   // Update hierarchy: children of source become children of target
-  await env.DB.prepare('UPDATE tag_hierarchy SET parent_id = ? WHERE parent_id = ?')
+  await env.DB.prepare('UPDATE tag_hierarchy SET parent_tag_id = ? WHERE parent_tag_id = ?')
     .bind(targetTagId, sourceTagId).run();
 
   // Remove source from hierarchy as child
-  await env.DB.prepare('DELETE FROM tag_hierarchy WHERE child_id = ?')
+  await env.DB.prepare('DELETE FROM tag_hierarchy WHERE child_tag_id = ?')
     .bind(sourceTagId).run();
 
   // Delete source tag
@@ -254,12 +254,12 @@ export async function handleSetTagParent(
   }
 
   // Remove existing parent relationship
-  await env.DB.prepare('DELETE FROM tag_hierarchy WHERE child_id = ?')
+  await env.DB.prepare('DELETE FROM tag_hierarchy WHERE child_tag_id = ?')
     .bind(childTagId).run();
 
   // Add new parent if specified
   if (parentTagId !== null) {
-    await env.DB.prepare('INSERT INTO tag_hierarchy (child_id, parent_id) VALUES (?, ?)')
+    await env.DB.prepare('INSERT INTO tag_hierarchy (child_tag_id, parent_tag_id) VALUES (?, ?)')
       .bind(childTagId, parentTagId).run();
   }
 
@@ -302,13 +302,13 @@ async function getDescendants(env: Env, tagId: number): Promise<number[]> {
   while (queue.length > 0) {
     const currentId = queue.shift()!;
     const children = await env.DB.prepare(
-      'SELECT child_id FROM tag_hierarchy WHERE parent_id = ?'
-    ).bind(currentId).all<{ child_id: number }>();
+      'SELECT child_tag_id FROM tag_hierarchy WHERE parent_tag_id = ?'
+    ).bind(currentId).all<{ child_tag_id: number }>();
 
     for (const child of children.results || []) {
-      if (!descendants.includes(child.child_id)) {
-        descendants.push(child.child_id);
-        queue.push(child.child_id);
+      if (!descendants.includes(child.child_tag_id)) {
+        descendants.push(child.child_tag_id);
+        queue.push(child.child_tag_id);
       }
     }
   }

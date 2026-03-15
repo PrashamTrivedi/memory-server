@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import { App } from '@modelcontextprotocol/ext-apps';
+import { App, applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from '@modelcontextprotocol/ext-apps';
 import '../shared/styles/base.css';
 
 interface TempMemory {
@@ -22,22 +22,39 @@ interface MemoriesData {
   };
 }
 
-function parseToolResult<T>(result: unknown): T | null {
-  if (!result || typeof result !== 'object') return null;
-  const typedResult = result as { content?: Array<{ type: string; text?: string }> };
-  const textContent = typedResult.content?.find((c) => c.type === 'text');
-  if (!textContent?.text) return null;
-  try {
-    const data = JSON.parse(textContent.text);
-    return data.success ? data.data : null;
-  } catch {
-    return null;
+function parseToolResult<T>(params: unknown): T | null {
+  if (!params || typeof params !== 'object') return null;
+
+  const typedParams = params as {
+    content?: Array<{ type: string; text?: string; mimeType?: string }>;
+    result?: { content?: Array<{ type: string; text?: string; mimeType?: string }> };
+    isError?: boolean;
+  };
+
+  if (typedParams.isError) return null;
+
+  const content = typedParams.content || typedParams.result?.content;
+  if (!content) return null;
+
+  // Claude.ai strips mimeType, so find JSON by content pattern
+  for (const item of content) {
+    if (item.type !== 'text' || !item.text) continue;
+    const text = item.text.trim();
+    if (!text.startsWith('{') && !text.startsWith('[')) continue;
+    try {
+      const data = JSON.parse(text);
+      return data.success ? data.data : data;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 function TriageDashboard() {
   const [app, setApp] = useState<App | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [memories, setMemories] = useState<TempMemory[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
@@ -45,8 +62,18 @@ function TriageDashboard() {
   useEffect(() => {
     const mcpApp = new App({ name: 'triage-dashboard', version: '1.0.0' });
 
-    mcpApp.ontoolresult = (event) => {
-      const data = parseToolResult<MemoriesData>(event.result);
+    // Register ALL handlers BEFORE connect()
+
+    // Handle tool input (when tool execution begins)
+    mcpApp.ontoolinput = (params) => {
+      console.log('[triage-dashboard] ontoolinput:', params);
+      setLoading(true);
+    };
+
+    // Handle tool result (when tool execution completes)
+    mcpApp.ontoolresult = (params) => {
+      console.log('[triage-dashboard] ontoolresult:', params);
+      const data = parseToolResult<MemoriesData>(params);
       if (data?.memories) {
         setMemories(data.memories);
       }
@@ -54,9 +81,38 @@ function TriageDashboard() {
       setActionInProgress(null);
     };
 
-    mcpApp.connect();
-    setApp(mcpApp);
-    setConnected(true);
+    // Handle host context changes (theme, styling)
+    mcpApp.onhostcontextchanged = (ctx) => {
+      console.log('[triage-dashboard] onhostcontextchanged:', ctx);
+      if (ctx.theme) applyDocumentTheme(ctx.theme);
+      if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+      if (ctx.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
+      if (ctx.safeAreaInsets) {
+        const { top, right, bottom, left } = ctx.safeAreaInsets;
+        document.body.style.padding = `${top}px ${right}px ${bottom}px ${left}px`;
+      }
+    };
+
+    // Handle teardown
+    mcpApp.onteardown = async () => {
+      console.log('[triage-dashboard] onteardown');
+      return {};
+    };
+
+    // Now connect
+    (async () => {
+      try {
+        await mcpApp.connect();
+        setApp(mcpApp);
+        setConnected(true);
+        setConnectionError(null);
+        console.log('[triage-dashboard] Connected successfully');
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error('[triage-dashboard] Connection failed:', errMsg);
+        setConnectionError(errMsg);
+      }
+    })();
   }, []);
 
   const refresh = async () => {
@@ -149,50 +205,64 @@ function TriageDashboard() {
   if (!connected) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">Connecting...</div>
+        <div className="text-center p-4">
+          {connectionError ? (
+            <>
+              <div className="text-red-500 font-medium mb-2">Connection Failed</div>
+              <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-sm">
+                {connectionError}
+              </div>
+              <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary text-xs mt-4">
+                MCP Apps require a host that supports the MCP Apps extension.
+              </div>
+            </>
+          ) : (
+            <div className="text-claude-text-secondary dark:text-claude-dark-text-secondary">Connecting...</div>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">Temporary Memories Triage</h1>
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-semibold text-claude-text dark:text-claude-dark-text mb-6">Temporary Memories Triage</h1>
 
       {/* Batch Actions */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6 pb-6 border-b border-claude-border dark:border-claude-dark-border">
         <button
           onClick={promoteAllHealthy}
           disabled={loading || healthy.length === 0}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          className="px-4 py-2 bg-green-600 text-white rounded-claude font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
           Promote All Healthy ({healthy.length})
         </button>
         <button
           onClick={dropAllExpiring}
           disabled={loading || expiringSoon.length === 0}
-          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+          className="px-4 py-2 bg-red-500 text-white rounded-claude font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
         >
           Drop All Expiring ({expiringSoon.length})
         </button>
         <button
           onClick={refresh}
           disabled={loading}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+          className="btn-secondary"
         >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
-        <span className="self-center text-sm text-gray-500 ml-auto">
+        <span className="self-center text-sm text-claude-text-secondary dark:text-claude-dark-text-secondary ml-auto">
           {memories.length} temporary memories
         </span>
       </div>
 
       {/* Expiring Soon Section */}
       {expiringSoon.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-red-500 dark:text-red-400 mb-3 flex items-center gap-2">
-            <span>⚠️</span> Expiring Soon ({expiringSoon.length})
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-4 flex items-center gap-2">
+            Expiring Soon ({expiringSoon.length})
           </h2>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {expiringSoon.map((memory) => (
               <MemoryRow
                 key={memory.id}
@@ -211,10 +281,10 @@ function TriageDashboard() {
       {/* Healthy Section */}
       {healthy.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-green-500 dark:text-green-400 mb-3 flex items-center gap-2">
-            <span>✓</span> Healthy ({healthy.length})
+          <h2 className="text-lg font-semibold text-green-600 dark:text-green-400 mb-4 flex items-center gap-2">
+            Healthy ({healthy.length})
           </h2>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {healthy.map((memory) => (
               <MemoryRow
                 key={memory.id}
@@ -232,7 +302,7 @@ function TriageDashboard() {
 
       {/* Empty State */}
       {memories.length === 0 && !loading && (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-12 text-claude-text-secondary dark:text-claude-dark-text-secondary">
           No temporary memories found.
           <br />
           Click Refresh to load temporary memories.
@@ -256,31 +326,37 @@ function MemoryRow({ memory, onKeep, onDrop, loading, getUrgencyColor, getUrgenc
   const progress = Math.max(0, Math.min(100, (memory.days_until_expiry / maxDays) * 100));
   const accessTarget = memory.stage === 1 ? 5 : 15;
 
+  const urgencyBadgeClass = memory.days_until_expiry <= 3
+    ? 'badge-danger'
+    : memory.days_until_expiry <= 7
+    ? 'badge-warning'
+    : 'badge-success';
+
   return (
-    <div className="p-4 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800">
+    <div className="card p-4">
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-medium truncate">{memory.name}</h3>
-            <span className={`px-2 py-0.5 text-xs text-white rounded ${getUrgencyColor(memory.days_until_expiry)}`}>
+            <h3 className="font-medium text-claude-text dark:text-claude-dark-text truncate">{memory.name}</h3>
+            <span className={`badge ${urgencyBadgeClass}`}>
               {getUrgencyLabel(memory.days_until_expiry)}
             </span>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+          <p className="text-sm text-claude-text-secondary dark:text-claude-dark-text-secondary truncate">
             {memory.content.slice(0, 100)}
             {memory.content.length > 100 && '...'}
           </p>
 
           {/* Progress Bar */}
-          <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+          <div className="mt-3 h-1.5 bg-claude-border dark:bg-claude-dark-border rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all ${getUrgencyColor(memory.days_until_expiry)}`}
+              className={`h-full transition-all rounded-full ${getUrgencyColor(memory.days_until_expiry)}`}
               style={{ width: `${progress}%` }}
             />
           </div>
 
           {/* Stats */}
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex gap-4">
+          <div className="mt-2 text-xs text-claude-text-secondary dark:text-claude-dark-text-secondary flex gap-4">
             <span>{memory.days_until_expiry} days left</span>
             <span>Stage {memory.stage}/2</span>
             <span>Accesses: {memory.access_count}/{accessTarget}</span>
@@ -288,18 +364,18 @@ function MemoryRow({ memory, onKeep, onDrop, loading, getUrgencyColor, getUrgenc
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <button
             onClick={onKeep}
             disabled={loading}
-            className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-claude font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
           >
             {loading ? '...' : 'Keep'}
           </button>
           <button
             onClick={onDrop}
             disabled={loading}
-            className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            className="btn-danger"
           >
             {loading ? '...' : 'Drop'}
           </button>

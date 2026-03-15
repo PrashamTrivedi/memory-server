@@ -2,6 +2,10 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js'
 import {createMcpHandler, WorkerTransport} from 'agents/mcp'
 import {z} from 'zod'
 import type {Env} from '../index.js'
+import {
+  registerAppTool,
+  registerAppResource,
+} from '@modelcontextprotocol/ext-apps/server'
 
 // Tool handlers
 import {
@@ -36,7 +40,7 @@ import {
 
 import {
   handleUiAppResource,
-  listUiAppResources,
+  mcpApps,
 } from './resources/ui-apps.js'
 
 // Prompt handlers
@@ -70,35 +74,53 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'get_memory',
-    'Retrieve a specific memory by ID',
     {
-      id: z.string().describe('Memory ID to retrieve'),
+      description: 'Retrieve a specific memory by ID',
+      inputSchema: {
+        id: z.string().describe('Memory ID to retrieve'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-editor' },
+      },
     },
     async (args) => {
       return await handleGetMemory(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'list_memories',
-    'List all memories with optional filtering and pagination',
     {
-      limit: z.number().optional().describe('Maximum number of memories to return'),
-      offset: z.number().optional().describe('Number of memories to skip'),
-      tags: z.array(z.string()).optional().describe('Filter by tags'),
+      description: 'List all memories with optional filtering and pagination',
+      inputSchema: {
+        limit: z.number().optional().describe('Maximum number of memories to return'),
+        offset: z.number().optional().describe('Number of memories to skip'),
+        tags: z.array(z.string()).optional().describe('Filter by tags'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-browser' },
+      },
     },
     async (args) => {
       return await handleListMemories(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'delete_memory',
-    'Delete a specific memory by ID',
     {
-      id: z.string().describe('Memory ID to delete'),
+      description: 'Delete a specific memory by ID',
+      inputSchema: {
+        id: z.string().describe('Memory ID to delete'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-browser' },
+      },
     },
     async (args) => {
       return await handleDeleteMemory(env, args)
@@ -116,64 +138,94 @@ export function createMCPMemoryServer(env: Env): McpServer {
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'find_memories',
-    'Search memories by content or tags with advanced filtering',
     {
-      query: z.string().optional().describe('Search query for content'),
-      tags: z.array(z.string()).optional().describe('Tags to filter by'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
-      offset: z.number().optional().describe('Number of results to skip'),
+      description: 'Search memories by content or tags with advanced filtering',
+      inputSchema: {
+        query: z.string().optional().describe('Search query for content'),
+        tags: z.array(z.string()).optional().describe('Tags to filter by'),
+        limit: z.number().optional().describe('Maximum number of results to return'),
+        offset: z.number().optional().describe('Number of results to skip'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-browser' },
+      },
     },
     async (args) => {
       return await handleFindMemories(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'add_tags',
-    'Add tags to existing memories',
     {
-      memoryId: z.string().describe('Memory ID to add tags to'),
-      tags: z.array(z.string()).describe('Tags to add'),
+      description: 'Add tags to existing memories',
+      inputSchema: {
+        memoryId: z.string().describe('Memory ID to add tags to'),
+        tags: z.array(z.string()).describe('Tags to add'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-browser' },
+      },
     },
     async (args) => {
       return await handleAddTags(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'promote_memory',
-    'Promote a temporary memory to permanent status',
     {
-      id: z.string().describe('Memory ID to promote'),
+      description: 'Promote a temporary memory to permanent status',
+      inputSchema: {
+        id: z.string().describe('Memory ID to promote'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://triage-dashboard' },
+      },
     },
     async (args) => {
       return await handlePromoteMemory(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'review_temporary_memories',
-    'List temporary memories with lifecycle metadata for review. Shows days until expiry, access count, stage, and last accessed time. Use to rescue important memories before they expire.',
     {
-      limit: z.number().optional().describe('Maximum number of memories to return (max 100)'),
-      offset: z.number().optional().describe('Number of memories to skip'),
+      description: 'List temporary memories with lifecycle metadata for review. Shows days until expiry, access count, stage, and last accessed time. Use to rescue important memories before they expire.',
+      inputSchema: {
+        limit: z.number().optional().describe('Maximum number of memories to return (max 100)'),
+        offset: z.number().optional().describe('Number of memories to skip'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://triage-dashboard' },
+      },
     },
     async (args) => {
       return await handleReviewTemporaryMemories(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'update_memory',
-    'Update an existing memory\'s content, name, or tags. Creates new memory if ID not found (upsert behavior).',
     {
-      id: z.string().describe('Memory ID to update (creates new if not found)'),
-      name: z.string().optional().describe('New name/title (required for new memories)'),
-      content: z.string().optional().describe('New content (required for new memories)'),
-      tags: z.array(z.string()).optional().describe('New tags (replaces existing). Supports hierarchical "parent>child" format'),
-      temporary: z.boolean().optional().describe('Create as temporary memory if creating new (ignored for updates)'),
+      description: 'Update an existing memory\'s content, name, or tags. Creates new memory if ID not found (upsert behavior).',
+      inputSchema: {
+        id: z.string().describe('Memory ID to update (creates new if not found)'),
+        name: z.string().optional().describe('New name/title (required for new memories)'),
+        content: z.string().optional().describe('New content (required for new memories)'),
+        tags: z.array(z.string()).optional().describe('New tags (replaces existing). Supports hierarchical "parent>child" format'),
+        temporary: z.boolean().optional().describe('Create as temporary memory if creating new (ignored for updates)'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://memory-editor' },
+      },
     },
     async (args) => {
       return await handleUpdateMemory(env, args)
@@ -181,45 +233,69 @@ export function createMCPMemoryServer(env: Env): McpServer {
   )
 
   // Tag management tools
-  server.tool(
+  registerAppTool(
+    server,
     'list_tags',
-    'List all tags with their hierarchy relationships and memory counts',
-    {},
+    {
+      description: 'List all tags with their hierarchy relationships and memory counts',
+      inputSchema: {},
+      _meta: {
+        ui: { resourceUri: 'ui://tag-manager' },
+      },
+    },
     async () => {
       return await handleListTags(env)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'rename_tag',
-    'Rename an existing tag',
     {
-      tagId: z.number().describe('Tag ID to rename'),
-      newName: z.string().describe('New name for the tag'),
+      description: 'Rename an existing tag',
+      inputSchema: {
+        tagId: z.number().describe('Tag ID to rename'),
+        newName: z.string().describe('New name for the tag'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://tag-manager' },
+      },
     },
     async (args) => {
       return await handleRenameTag(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'merge_tags',
-    'Merge one tag into another, moving all memory associations. The source tag is deleted.',
     {
-      sourceTagId: z.number().describe('Tag ID to merge from (will be deleted)'),
-      targetTagId: z.number().describe('Tag ID to merge into (will be kept)'),
+      description: 'Merge one tag into another, moving all memory associations. The source tag is deleted.',
+      inputSchema: {
+        sourceTagId: z.number().describe('Tag ID to merge from (will be deleted)'),
+        targetTagId: z.number().describe('Tag ID to merge into (will be kept)'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://tag-manager' },
+      },
     },
     async (args) => {
       return await handleMergeTags(env, args)
     }
   )
 
-  server.tool(
+  registerAppTool(
+    server,
     'set_tag_parent',
-    'Set or remove parent-child relationship between tags',
     {
-      childTagId: z.number().describe('Child tag ID'),
-      parentTagId: z.number().nullable().describe('Parent tag ID (null to remove parent and make root tag)'),
+      description: 'Set or remove parent-child relationship between tags',
+      inputSchema: {
+        childTagId: z.number().describe('Child tag ID'),
+        parentTagId: z.number().nullable().describe('Parent tag ID (null to remove parent and make root tag)'),
+      },
+      _meta: {
+        ui: { resourceUri: 'ui://tag-manager' },
+      },
     },
     async (args) => {
       return await handleSetTagParent(env, args)
@@ -288,19 +364,15 @@ export function createMCPMemoryServer(env: Env): McpServer {
   )
 
   // Register UI app resources
-  const uiApps = listUiAppResources()
-  for (const app of uiApps) {
-    server.registerResource(
-      app.name.toLowerCase().replace(/\s+/g, '-'),
+  for (const app of mcpApps) {
+    registerAppResource(
+      server,
+      app.name,
       app.uri,
       {
-        title: app.name,
         description: app.description,
-        mimeType: 'text/html'
       },
-      async (uri: URL) => {
-        return await handleUiAppResource(env, uri.toString())
-      }
+      async () => await handleUiAppResource(env, app.uri)
     )
   }
 

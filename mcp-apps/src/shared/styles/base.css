@@ -7,28 +7,91 @@
 }
 
 body {
-  @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
-  font-family: system-ui, -apple-system, sans-serif;
+  @apply bg-claude-cream dark:bg-claude-dark text-claude-text dark:text-claude-dark-text;
+  font-family: 'Söhne', system-ui, -apple-system, 'Segoe UI', sans-serif;
   margin: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-800;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded;
+  @apply bg-claude-border dark:bg-claude-dark-border rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-500;
+  @apply bg-claude-text-secondary dark:bg-claude-dark-text-secondary;
+}
+
+/* Claude-style components */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-claude-coral text-white rounded-claude font-medium
+           hover:bg-claude-coral-hover transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-claude-coral focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-white dark:bg-claude-dark-card text-claude-text dark:text-claude-dark-text
+           border border-claude-border dark:border-claude-dark-border rounded-claude font-medium
+           hover:bg-claude-beige dark:hover:bg-claude-dark transition-colors duration-150
+           focus:outline-none focus:ring-2 focus:ring-claude-coral focus:ring-offset-2;
+  }
+
+  .btn-danger {
+    @apply px-3 py-1.5 text-sm text-red-600 dark:text-red-400 bg-transparent
+           hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-150;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 bg-white dark:bg-claude-dark-card
+           border border-claude-border dark:border-claude-dark-border rounded-claude
+           text-claude-text dark:text-claude-dark-text
+           placeholder:text-claude-text-secondary dark:placeholder:text-claude-dark-text-secondary
+           focus:outline-none focus:ring-2 focus:ring-claude-coral focus:border-transparent
+           transition-shadow duration-150;
+  }
+
+  .card {
+    @apply bg-white dark:bg-claude-dark-card
+           border border-claude-border dark:border-claude-dark-border
+           rounded-claude shadow-claude hover:shadow-claude-hover
+           transition-shadow duration-150;
+  }
+
+  .tag {
+    @apply px-2 py-0.5 text-xs font-medium
+           bg-claude-coral-light dark:bg-claude-coral/20
+           text-claude-coral dark:text-claude-coral
+           rounded-full;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+
+  .badge-success {
+    @apply bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400;
+  }
+
+  .badge-warning {
+    @apply bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400;
+  }
 }
 
 /* Utility classes */
