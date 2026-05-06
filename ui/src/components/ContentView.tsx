@@ -17,8 +17,19 @@ interface ContentViewProps {
 export function ContentView({ memory, tempMetadata, onDelete, onTagClick, onClose }: ContentViewProps) {
   const [editing, setEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [copied, setCopied] = useState<'id' | 'name' | null>(null);
   const updateMemory = useUpdateMemory();
   const promoteMemory = usePromoteMemory();
+
+  const copy = useCallback(async (value: string, kind: 'id' | 'name') => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      // ignore — clipboard may be unavailable in non-secure contexts
+    }
+  }, []);
 
   useEffect(() => {
     setEditing(false);
@@ -74,6 +85,17 @@ export function ContentView({ memory, tempMetadata, onDelete, onTagClick, onClos
           >
             {memory.name}
           </h1>
+          <button
+            onClick={() => copy(memory.name, 'name')}
+            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all shrink-0"
+            title={copied === 'name' ? 'Copied!' : 'Copy name'}
+          >
+            {copied === 'name' ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            )}
+          </button>
           {tempMetadata && (
             <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
               Temp &middot; Stage {tempMetadata.stage}
@@ -142,7 +164,20 @@ export function ContentView({ memory, tempMetadata, onDelete, onTagClick, onClos
         ) : (
           <div className="max-w-3xl mx-auto px-8 py-8">
             {/* Metadata line */}
-            <div className="flex items-center gap-3 mb-5 text-xs text-slate-400 dark:text-slate-500 font-medium">
+            <div className="flex items-center flex-wrap gap-3 mb-5 text-xs text-slate-400 dark:text-slate-500 font-medium">
+              <button
+                onClick={() => copy(memory.id, 'id')}
+                className="inline-flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all group"
+                title={copied === 'id' ? 'Copied!' : 'Copy memory ID'}
+              >
+                <span className="font-mono text-[11px] tracking-tight">{memory.id}</span>
+                {copied === 'id' ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-green-500"><path d="M20 6L9 17l-5-5"/></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-50 group-hover:opacity-100 transition-opacity"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                )}
+              </button>
+              <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
               <span className="tabular-nums">Created {formatFullDate(memory.created_at)}</span>
               {memory.updated_at !== memory.created_at && (
                 <>
