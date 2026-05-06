@@ -19,9 +19,15 @@
     "cf-typegen": "wrangler types"
   },
   "overrides": {
-    "agents": {
-      "@modelcontextprotocol/sdk": "^1.29.0"
-    }
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "path-to-regexp": "^8.4.0",
+    "picomatch": "^4.0.4",
+    "ip-address": "^10.1.1",
+    "rollup": "^4.59.0",
+    "postcss": "^8.5.10",
+    "vite": "^8.0.10",
+    "qs": "^6.14.2",
+    "ajv": "^8.18.0"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.14",

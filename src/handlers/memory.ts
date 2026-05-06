@@ -21,9 +21,6 @@ import {
   formatTemporaryMemoriesAsMarkdown
 } from '../mcp/utils/formatters';
 
-// Preview length for list/search responses (chars). Detail view returns full content.
-const PREVIEW_LEN = 280;
-
 /**
  * Create a new memory
  * POST /api/memories
@@ -165,9 +162,6 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
 /**
  * List memories with pagination
  * GET /api/memories?limit=10&offset=0
- *
- * List responses return a content preview (first PREVIEW_LEN chars), not the
- * full content. Detail view (`getMemory`) returns full content.
  */
 export async function listMemories(c: Context<{ Bindings: Env }>) {
   try {
@@ -180,7 +174,7 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
     // Pull D1 page sized to (offset+limit). Top-N by updated_at, with preview only.
     const fetchSize = Math.min(offset + limit, 200);
     const pageStmt = c.env.DB.prepare(`
-      SELECT id, name, substr(content, 1, ${PREVIEW_LEN}) AS content, url, created_at, updated_at
+      SELECT id, name, content, url, created_at, updated_at
       FROM memories
       ORDER BY updated_at DESC, created_at DESC
       LIMIT ?
@@ -205,14 +199,8 @@ export async function listMemories(c: Context<{ Bindings: Env }>) {
       updated_at: row.updated_at,
     }));
 
-    // Truncate temp memory previews to match D1 shape.
-    const tempPreviews: Memory[] = tempMemories.map(m => ({
-      ...m,
-      content: m.content.length > PREVIEW_LEN ? m.content.slice(0, PREVIEW_LEN) : m.content,
-    }));
-
     // Merge top-N D1 page with temp memories, sort, slice the requested window.
-    const merged = [...d1Memories, ...tempPreviews].sort(
+    const merged = [...d1Memories, ...tempMemories].sort(
       (a, b) => b.updated_at - a.updated_at
     );
     const paginated = merged.slice(offset, offset + limit);
@@ -465,13 +453,9 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
 
     // Search temporary memories in KV (small set)
     const tempMatches = await TemporaryMemoryService.search(c.env, query || '', tags);
-    const tempPreviews: Memory[] = tempMatches.map(m => ({
-      ...m,
-      content: m.content.length > PREVIEW_LEN ? m.content.slice(0, PREVIEW_LEN) : m.content,
-    }));
 
     // Merge and sort by updated_at desc, then slice the requested window.
-    const merged = [...d1Memories, ...tempPreviews].sort(
+    const merged = [...d1Memories, ...tempMatches].sort(
       (a, b) => b.updated_at - a.updated_at
     );
     const paginated = merged.slice(offset, offset + limit);
@@ -831,7 +815,7 @@ async function searchMemoriesByQuery(db: D1Database, query: string, limit: numbe
   const processedQuery = processSearchQuery(query);
 
   const pageStmt = db.prepare(`
-    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
+    SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
     JOIN memories m ON m.rowid = fts.rowid
     WHERE memories_fts MATCH ?
@@ -875,7 +859,7 @@ async function searchMemoriesByTags(db: D1Database, tagNames: string[], limit: n
   const placeholders = tagNames.map(() => '?').join(',');
 
   const pageStmt = db.prepare(`
-    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
+    SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories m
     JOIN memory_tags mt ON m.id = mt.memory_id
     JOIN tags t ON mt.tag_id = t.id
@@ -929,7 +913,7 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
   const processedQuery = processSearchQuery(query);
 
   const pageStmt = db.prepare(`
-    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
+    SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
     JOIN memories m ON m.rowid = fts.rowid
     JOIN memory_tags mt ON m.id = mt.memory_id
