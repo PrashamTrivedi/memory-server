@@ -21,6 +21,9 @@ import {
   formatTemporaryMemoriesAsMarkdown
 } from '../mcp/utils/formatters';
 
+// Preview length for list/search responses (chars). Detail view returns full content.
+const PREVIEW_LEN = 280;
+
 /**
  * Create a new memory
  * POST /api/memories
@@ -162,49 +165,59 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
 /**
  * List memories with pagination
  * GET /api/memories?limit=10&offset=0
+ *
+ * List responses return a content preview (first PREVIEW_LEN chars), not the
+ * full content. Detail view (`getMemory`) returns full content.
  */
 export async function listMemories(c: Context<{ Bindings: Env }>) {
   try {
     const limit = Math.min(parseInt(c.req.query('limit') || '10'), 100);
     const offset = parseInt(c.req.query('offset') || '0');
 
-    // Get permanent memories from D1
-    const stmt = c.env.DB.prepare(`
-      SELECT id, name, content, url, created_at, updated_at
-      FROM memories
-      ORDER BY updated_at DESC, created_at DESC
-    `);
-
-    const result = await stmt.all<MemoryRow>();
-
-    // Enrich D1 memories with tags
-    const d1Memories: Memory[] = [];
-    for (const row of result.results || []) {
-      const tags = await getMemoryTags(c.env.DB, row.id);
-      d1Memories.push({
-        id: row.id,
-        name: row.name,
-        content: row.content,
-        url: row.url || undefined,
-        tags,
-        created_at: row.created_at,
-        updated_at: row.updated_at
-      });
-    }
-
-    // Get temporary memories from KV
+    // Pull all temp memories (small set, KV-bound).
     const tempMemories = await TemporaryMemoryService.listAll(c.env);
 
-    // Merge and sort by updated_at desc
-    const allMemories = [...d1Memories, ...tempMemories].sort(
+    // Pull D1 page sized to (offset+limit). Top-N by updated_at, with preview only.
+    const fetchSize = Math.min(offset + limit, 200);
+    const pageStmt = c.env.DB.prepare(`
+      SELECT id, name, substr(content, 1, ${PREVIEW_LEN}) AS content, url, created_at, updated_at
+      FROM memories
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT ?
+    `);
+    const countStmt = c.env.DB.prepare(`SELECT COUNT(*) AS count FROM memories`);
+
+    const [pageResult, countResult] = await Promise.all([
+      pageStmt.bind(fetchSize).all<MemoryRow>(),
+      countStmt.first<{ count: number }>(),
+    ]);
+
+    const rows = pageResult.results || [];
+    const tagMap = await getMemoryTagsBatch(c.env.DB, rows.map(r => r.id));
+
+    const d1Memories: Memory[] = rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      content: row.content,
+      url: row.url || undefined,
+      tags: tagMap.get(row.id) || [],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+
+    // Truncate temp memory previews to match D1 shape.
+    const tempPreviews: Memory[] = tempMemories.map(m => ({
+      ...m,
+      content: m.content.length > PREVIEW_LEN ? m.content.slice(0, PREVIEW_LEN) : m.content,
+    }));
+
+    // Merge top-N D1 page with temp memories, sort, slice the requested window.
+    const merged = [...d1Memories, ...tempPreviews].sort(
       (a, b) => b.updated_at - a.updated_at
     );
+    const paginated = merged.slice(offset, offset + limit);
 
-    const total = allMemories.length;
-
-    // Apply pagination
-    const paginated = allMemories.slice(offset, offset + limit);
-
+    const total = (countResult?.count || 0) + tempMemories.length;
     const pagination = {
       total,
       limit,
@@ -430,31 +443,39 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
 
     const tags = tagsParam ? tagsParam.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined;
 
-    // Search D1 (permanent memories)
+    // Bound D1 fetch by the requested page window.
+    const fetchSize = Math.min(offset + limit, 200);
+
+    // Search D1 (permanent memories) — top-N by relevance/date with preview only.
     let d1Memories: Memory[] = [];
+    let d1Total = 0;
     if (query && tags && tags.length > 0) {
-      const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, 1000, 0);
+      const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, fetchSize, 0);
       d1Memories = result.memories;
+      d1Total = result.total;
     } else if (query) {
-      const result = await searchMemoriesByQuery(c.env.DB, query, 1000, 0);
+      const result = await searchMemoriesByQuery(c.env.DB, query, fetchSize, 0);
       d1Memories = result.memories;
+      d1Total = result.total;
     } else if (tags && tags.length > 0) {
-      const result = await searchMemoriesByTags(c.env.DB, tags, 1000, 0);
+      const result = await searchMemoriesByTags(c.env.DB, tags, fetchSize, 0);
       d1Memories = result.memories;
+      d1Total = result.total;
     }
 
-    // Search temporary memories in KV
-    const tempMemories = await TemporaryMemoryService.search(c.env, query || '', tags);
+    // Search temporary memories in KV (small set)
+    const tempMatches = await TemporaryMemoryService.search(c.env, query || '', tags);
+    const tempPreviews: Memory[] = tempMatches.map(m => ({
+      ...m,
+      content: m.content.length > PREVIEW_LEN ? m.content.slice(0, PREVIEW_LEN) : m.content,
+    }));
 
-    // Merge and sort by updated_at desc
-    const allMemories = [...d1Memories, ...tempMemories].sort(
+    // Merge and sort by updated_at desc, then slice the requested window.
+    const merged = [...d1Memories, ...tempPreviews].sort(
       (a, b) => b.updated_at - a.updated_at
     );
-
-    const total = allMemories.length;
-
-    // Apply pagination
-    const paginated = allMemories.slice(offset, offset + limit);
+    const paginated = merged.slice(offset, offset + limit);
+    const total = d1Total + tempMatches.length;
 
     const pagination = {
       total,
@@ -646,9 +667,41 @@ async function getMemoryTags(db: D1Database, memoryId: string): Promise<string[]
     WHERE mt.memory_id = ?
     ORDER BY t.name
   `);
-  
+
   const result = await stmt.bind(memoryId).all<{ name: string }>();
   return result.results?.map(r => r.name) || [];
+}
+
+/**
+ * Batch-fetch tags for many memory IDs in a single D1 round-trip.
+ * Returns map from memory_id → tag names (alphabetical).
+ */
+async function getMemoryTagsBatch(
+  db: D1Database,
+  memoryIds: string[]
+): Promise<Map<string, string[]>> {
+  const tagMap = new Map<string, string[]>();
+  if (memoryIds.length === 0) return tagMap;
+
+  const placeholders = memoryIds.map(() => '?').join(',');
+  const stmt = db.prepare(`
+    SELECT mt.memory_id, t.name
+    FROM memory_tags mt
+    JOIN tags t ON t.id = mt.tag_id
+    WHERE mt.memory_id IN (${placeholders})
+    ORDER BY mt.memory_id, t.name
+  `);
+
+  const result = await stmt.bind(...memoryIds).all<{ memory_id: string; name: string }>();
+  for (const row of result.results || []) {
+    const existing = tagMap.get(row.memory_id);
+    if (existing) {
+      existing.push(row.name);
+    } else {
+      tagMap.set(row.memory_id, [row.name]);
+    }
+  }
+  return tagMap;
 }
 
 /**
@@ -776,53 +829,53 @@ function processSearchQuery(query: string): string {
 async function searchMemoriesByQuery(db: D1Database, query: string, limit: number, offset: number) {
   // Process query to support partial word matching
   const processedQuery = processSearchQuery(query);
-  
-  const stmt = db.prepare(`
-    SELECT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
+
+  const pageStmt = db.prepare(`
+    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
     JOIN memories m ON m.rowid = fts.rowid
     WHERE memories_fts MATCH ?
     ORDER BY rank, m.updated_at DESC
     LIMIT ? OFFSET ?
   `);
-  
-  const result = await stmt.bind(processedQuery, limit, offset).all<MemoryRow>();
-  
-  // Get total count
-  const countResult = await db.prepare(`
+  const countStmt = db.prepare(`
     SELECT COUNT(*) as count
     FROM memories_fts
     WHERE memories_fts MATCH ?
-  `).bind(processedQuery).first<{ count: number }>();
-  
-  const memories: Memory[] = [];
-  for (const row of result.results || []) {
-    const tags = await getMemoryTags(db, row.id);
-    memories.push({
-      id: row.id,
-      name: row.name,
-      content: row.content,
-      url: row.url || undefined,
-      tags,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    });
-  }
-  
+  `);
+
+  const [result, countResult] = await Promise.all([
+    pageStmt.bind(processedQuery, limit, offset).all<MemoryRow>(),
+    countStmt.bind(processedQuery).first<{ count: number }>(),
+  ]);
+
+  const rows = result.results || [];
+  const tagMap = await getMemoryTagsBatch(db, rows.map(r => r.id));
+
+  const memories: Memory[] = rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    content: row.content,
+    url: row.url || undefined,
+    tags: tagMap.get(row.id) || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+
   return {
     memories,
-    total: countResult?.count || 0
+    total: countResult?.count || 0,
   };
 }
 
 /**
- * Search memories by tags
+ * Search memories by tags (must match ALL given tags)
  */
 async function searchMemoriesByTags(db: D1Database, tagNames: string[], limit: number, offset: number) {
   const placeholders = tagNames.map(() => '?').join(',');
-  
-  const stmt = db.prepare(`
-    SELECT DISTINCT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
+
+  const pageStmt = db.prepare(`
+    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
     FROM memories m
     JOIN memory_tags mt ON m.id = mt.memory_id
     JOIN tags t ON mt.tag_id = t.id
@@ -832,53 +885,51 @@ async function searchMemoriesByTags(db: D1Database, tagNames: string[], limit: n
     ORDER BY m.updated_at DESC, m.created_at DESC
     LIMIT ? OFFSET ?
   `);
-  
-  const result = await stmt.bind(...tagNames, tagNames.length, limit, offset).all<MemoryRow>();
-  
-  // Get total count
   const countStmt = db.prepare(`
-    SELECT COUNT(DISTINCT m.id) as count
-    FROM memories m
-    JOIN memory_tags mt ON m.id = mt.memory_id
-    JOIN tags t ON mt.tag_id = t.id
-    WHERE t.name IN (${placeholders})
-    GROUP BY m.id
-    HAVING COUNT(DISTINCT t.id) = ?
+    SELECT COUNT(*) AS count FROM (
+      SELECT m.id
+      FROM memories m
+      JOIN memory_tags mt ON m.id = mt.memory_id
+      JOIN tags t ON mt.tag_id = t.id
+      WHERE t.name IN (${placeholders})
+      GROUP BY m.id
+      HAVING COUNT(DISTINCT t.id) = ?
+    )
   `);
-  
-  const countResult = await countStmt.bind(...tagNames, tagNames.length).first<{ count: number }>();
-  
-  const memories: Memory[] = [];
-  for (const row of result.results || []) {
-    const tags = await getMemoryTags(db, row.id);
-    memories.push({
-      id: row.id,
-      name: row.name,
-      content: row.content,
-      url: row.url || undefined,
-      tags,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    });
-  }
-  
+
+  const [result, countResult] = await Promise.all([
+    pageStmt.bind(...tagNames, tagNames.length, limit, offset).all<MemoryRow>(),
+    countStmt.bind(...tagNames, tagNames.length).first<{ count: number }>(),
+  ]);
+
+  const rows = result.results || [];
+  const tagMap = await getMemoryTagsBatch(db, rows.map(r => r.id));
+
+  const memories: Memory[] = rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    content: row.content,
+    url: row.url || undefined,
+    tags: tagMap.get(row.id) || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+
   return {
     memories,
-    total: countResult?.count || 0
+    total: countResult?.count || 0,
   };
 }
 
 /**
- * Search memories by both query and tags
+ * Search memories by both query and tags (must match ALL given tags)
  */
 async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNames: string[], limit: number, offset: number) {
   const placeholders = tagNames.map(() => '?').join(',');
-  
-  // Process query to support partial word matching
   const processedQuery = processSearchQuery(query);
-  
-  const stmt = db.prepare(`
-    SELECT DISTINCT m.id, m.name, m.content, m.url, m.created_at, m.updated_at
+
+  const pageStmt = db.prepare(`
+    SELECT m.id, m.name, substr(m.content, 1, ${PREVIEW_LEN}) AS content, m.url, m.created_at, m.updated_at
     FROM memories_fts fts
     JOIN memories m ON m.rowid = fts.rowid
     JOIN memory_tags mt ON m.id = mt.memory_id
@@ -889,40 +940,40 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     ORDER BY rank, m.updated_at DESC
     LIMIT ? OFFSET ?
   `);
-  
-  const result = await stmt.bind(processedQuery, ...tagNames, tagNames.length, limit, offset).all<MemoryRow>();
-  
-  // Get total count
   const countStmt = db.prepare(`
-    SELECT COUNT(DISTINCT m.id) as count
-    FROM memories_fts fts
-    JOIN memories m ON m.rowid = fts.rowid
-    JOIN memory_tags mt ON m.id = mt.memory_id
-    JOIN tags t ON mt.tag_id = t.id
-    WHERE memories_fts MATCH ? AND t.name IN (${placeholders})
-    GROUP BY m.id
-    HAVING COUNT(DISTINCT t.id) = ?
+    SELECT COUNT(*) AS count FROM (
+      SELECT m.id
+      FROM memories_fts fts
+      JOIN memories m ON m.rowid = fts.rowid
+      JOIN memory_tags mt ON m.id = mt.memory_id
+      JOIN tags t ON mt.tag_id = t.id
+      WHERE memories_fts MATCH ? AND t.name IN (${placeholders})
+      GROUP BY m.id
+      HAVING COUNT(DISTINCT t.id) = ?
+    )
   `);
-  
-  const countResult = await countStmt.bind(processedQuery, ...tagNames, tagNames.length).first<{ count: number }>();
-  
-  const memories: Memory[] = [];
-  for (const row of result.results || []) {
-    const tags = await getMemoryTags(db, row.id);
-    memories.push({
-      id: row.id,
-      name: row.name,
-      content: row.content,
-      url: row.url || undefined,
-      tags,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    });
-  }
-  
+
+  const [result, countResult] = await Promise.all([
+    pageStmt.bind(processedQuery, ...tagNames, tagNames.length, limit, offset).all<MemoryRow>(),
+    countStmt.bind(processedQuery, ...tagNames, tagNames.length).first<{ count: number }>(),
+  ]);
+
+  const rows = result.results || [];
+  const tagMap = await getMemoryTagsBatch(db, rows.map(r => r.id));
+
+  const memories: Memory[] = rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    content: row.content,
+    url: row.url || undefined,
+    tags: tagMap.get(row.id) || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+
   return {
     memories,
-    total: countResult?.count || 0
+    total: countResult?.count || 0,
   };
 }
 

@@ -17,8 +17,8 @@ interface KVMetadata {
   updatedAt: string;
 }
 
-function isValidAppName(name: string): name is McpAppName {
-  return VALID_APP_NAMES.includes(name as McpAppName);
+function isValidAppName(name: string | undefined): name is McpAppName {
+  return name !== undefined && VALID_APP_NAMES.includes(name as McpAppName);
 }
 
 function isValidHtml(content: string): boolean {

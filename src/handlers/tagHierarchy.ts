@@ -68,7 +68,7 @@ export async function createTagsWithRelationship(c: Context<{ Bindings: Env }>) 
  */
 export async function addParent(c: Context<{ Bindings: Env }>) {
   try {
-    const childTagId = parseInt(c.req.param('id'));
+    const childTagId = parseInt(c.req.param('id') ?? '');
 
     if (isNaN(childTagId)) {
       return returnValidationError(c, 'Invalid child tag ID');
@@ -106,8 +106,8 @@ export async function addParent(c: Context<{ Bindings: Env }>) {
  */
 export async function removeParent(c: Context<{ Bindings: Env }>) {
   try {
-    const childTagId = parseInt(c.req.param('id'));
-    const parentTagId = parseInt(c.req.param('parentId'));
+    const childTagId = parseInt(c.req.param('id') ?? '');
+    const parentTagId = parseInt(c.req.param('parentId') ?? '');
 
     if (isNaN(childTagId) || isNaN(parentTagId)) {
       return returnValidationError(c, 'Invalid tag IDs');
@@ -143,7 +143,7 @@ export async function removeParent(c: Context<{ Bindings: Env }>) {
  */
 export async function getAncestors(c: Context<{ Bindings: Env }>) {
   try {
-    const tagId = parseInt(c.req.param('id'));
+    const tagId = parseInt(c.req.param('id') ?? '');
 
     if (isNaN(tagId)) {
       return returnValidationError(c, 'Invalid tag ID');
@@ -181,7 +181,7 @@ export async function getAncestors(c: Context<{ Bindings: Env }>) {
  */
 export async function getDescendants(c: Context<{ Bindings: Env }>) {
   try {
-    const tagId = parseInt(c.req.param('id'));
+    const tagId = parseInt(c.req.param('id') ?? '');
 
     if (isNaN(tagId)) {
       return returnValidationError(c, 'Invalid tag ID');
@@ -241,7 +241,7 @@ export async function getTagTree(c: Context<{ Bindings: Env }>) {
  */
 export async function getImmediateParents(c: Context<{ Bindings: Env }>) {
   try {
-    const tagId = parseInt(c.req.param('id'));
+    const tagId = parseInt(c.req.param('id') ?? '');
 
     if (isNaN(tagId)) {
       return returnValidationError(c, 'Invalid tag ID');
@@ -279,7 +279,7 @@ export async function getImmediateParents(c: Context<{ Bindings: Env }>) {
  */
 export async function getImmediateChildren(c: Context<{ Bindings: Env }>) {
   try {
-    const tagId = parseInt(c.req.param('id'));
+    const tagId = parseInt(c.req.param('id') ?? '');
 
     if (isNaN(tagId)) {
       return returnValidationError(c, 'Invalid tag ID');

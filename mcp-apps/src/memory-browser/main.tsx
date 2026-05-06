@@ -100,11 +100,12 @@ function MemoryBrowser() {
       console.log('[memory-browser] params.isError:', params?.isError);
 
       // Try to find content in various places
-      const content = params?.content || params?.result?.content || params?.result;
+      const p = params as any;
+      const content = p?.content || p?.result?.content || p?.result;
       console.log('[memory-browser] Extracted content:', content);
 
       if (Array.isArray(content)) {
-        content.forEach((item, i) => {
+        content.forEach((item: any, i: number) => {
           console.log(`[memory-browser] content[${i}]:`, {
             type: item.type,
             mimeType: item.mimeType,
