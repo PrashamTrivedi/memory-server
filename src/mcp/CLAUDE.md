@@ -27,8 +27,24 @@ Two behaviours differ from the previous `enableJsonResponse: true` transport:
 
 - Clients must accept **both** `application/json` and `text/event-stream`;
   a single-encoding `Accept` header now gets a `406`.
-- 2026-07-28 requests must declare their method in an `Mcp-Method` header that
-  agrees with the body (SEP-2243).
+- 2026-07-28 requests must declare their method in an `Mcp-Method` header, and
+  `tools/call` must additionally name the tool in an `Mcp-Name` header. Both
+  have to agree with the body or the request is rejected with `-32020`
+  (SEP-2243). Conformant client SDKs set these; hand-rolled `curl` calls do not.
+
+Probing the deployed endpoint by hand therefore looks like:
+
+```bash
+curl -X POST "$HOST/mcp" \
+  -H 'authorization: Bearer <token>' \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -H 'mcp-method: tools/call' -H 'mcp-name: list_tags' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+        "name":"list_tags","arguments":{},
+        "_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28",
+                 "io.modelcontextprotocol/clientCapabilities":{}}}}'
+```
 
 ## Endpoints
 
