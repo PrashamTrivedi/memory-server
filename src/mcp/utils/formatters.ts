@@ -3,17 +3,33 @@ import type { Memory, TemporaryMemoryWithMetadata } from '../../../types/index.j
 /**
  * MCP Tool Response Content Item
  */
-export interface MCPContentItem {
-  type: 'text' | 'image' | 'resource';
-  text?: string;
-  mimeType?: string;
-}
+export type MCPContentItem =
+  | {
+      type: 'text';
+      text: string;
+      /**
+       * Not part of the MCP text-content shape, and stripped by some hosts.
+       * Retained because the bundled MCP Apps have long tolerated it; they
+       * locate the JSON block by content pattern rather than by this field.
+       */
+      mimeType?: string;
+    }
+  | { type: 'image'; data: string; mimeType: string }
+  | { type: 'resource'; resource: { uri: string; text: string; mimeType?: string } };
 
 /**
  * MCP Tool Response
  */
-export interface MCPToolResponse {
+export type MCPToolResponse = {
   content: MCPContentItem[];
+  /**
+   * Machine-readable mirror of the JSON content block.
+   *
+   * Hosts that understand structured output read this directly instead of
+   * pattern-matching the text blocks; clients that predate it keep working
+   * off `content`.
+   */
+  structuredContent?: Record<string, unknown>;
 }
 
 /**
@@ -293,7 +309,10 @@ export function createDualFormatResponse(
         text: JSON.stringify(structuredData, null, 2),
         mimeType: 'application/json'
       }
-    ]
+    ],
+    // Third format, for hosts that support it. The two text blocks above are
+    // kept verbatim so nothing that reads them today changes behaviour.
+    structuredContent: structuredData as Record<string, unknown>
   };
 }
 

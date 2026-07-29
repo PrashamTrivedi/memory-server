@@ -741,9 +741,21 @@ Comprehensive guide to React hooks...
 
 The Markdown format provides a human-readable, AI-friendly representation of the data, while the JSON format maintains complete structured information. Both formats are backward compatible, with JSON remaining the default when no `Accept` header is specified.
 
-### MCP Endpoint
+### MCP Endpoints
 
-- `ALL /mcp` - Model Context Protocol endpoint
+- `ALL /mcp` - Model Context Protocol endpoint (tools, resources, prompts)
+- `ALL /mcp/tools-only` - Tools-only surface for hosts that ignore resources and
+  prompts (e.g. Cursor, Gemini CLI). The `memory://` resources and the workflow
+  prompts are reprojected as tools, so no functionality is lost.
+- `GET /mcp/health` - Advertised capabilities and tool names per endpoint
+
+The server speaks the **2026-07-28** MCP revision and falls back to the 2025-era
+revisions for clients that still use them. MCP Apps (`ui://` resources) are
+advertised only to clients that declare the `io.modelcontextprotocol/ui`
+extension.
+
+Note: per the streamable HTTP transport, MCP clients must send an `Accept`
+header listing **both** `application/json` and `text/event-stream`.
 
 ### Health Check
 
