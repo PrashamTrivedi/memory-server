@@ -5,7 +5,7 @@ import * as memoryHandlers from './handlers/memory';
 import * as apiKeyHandlers from './handlers/apiKeys';
 import * as skillHandlers from './handlers/skills';
 import * as mcpAppsAdminHandlers from './handlers/mcpAppsAdmin';
-import { handleMCPHttpRequest } from './mcp/server';
+import { handleMCPHttpRequest, describeTools, FULL_PROFILE, TOOLS_ONLY_PROFILE } from './mcp/server';
 import { getEntityName } from './middleware/apiKeyAuth';
 import { dualAuth } from './middleware/dualAuth';
 import { getProtectedResourceMetadata, getAuthorizationServerMetadata } from './oauth/metadata';
@@ -61,7 +61,10 @@ app.get('/skills/download/:token', skillHandlers.downloadSkillPackage);
 
 // Apply authentication to API and MCP routes (supports both API Key and JWT)
 app.use('/api/*', dualAuth);
+// Listed explicitly rather than as '/mcp/*' so that the public '/mcp/health'
+// probe stays unauthenticated.
 app.use('/mcp', dualAuth);
+app.use('/mcp/tools-only', dualAuth);
 
 // Apply rate limiting to API routes
 app.use('/api/*', async (c, next) => {
@@ -81,7 +84,7 @@ app.use('/api/*', async (c, next) => {
 });
 
 // Apply rate limiting to MCP routes
-app.use('/mcp', async (c, next) => {
+const mcpRateLimit = async (c: any, next: any) => {
   const entityName = getEntityName(c);
   const { success } = await c.env.MCP_RATE_LIMITER.limit({
     key: entityName
@@ -95,7 +98,10 @@ app.use('/mcp', async (c, next) => {
   }
 
   await next();
-});
+};
+
+app.use('/mcp', mcpRateLimit);
+app.use('/mcp/tools-only', mcpRateLimit);
 
 // Health check endpoint (no auth required)
 app.get('/health', (c) => {
@@ -159,10 +165,10 @@ app.delete('/api/admin/mcp-apps/:appName', mcpAppsAdminHandlers.deleteMcpApp);
 // Skill Package Generation endpoints
 app.post('/api/skills/generate', skillHandlers.generateSkillPackage);
 
-// MCP endpoint
+// MCP endpoint — full surface (tools + resources + prompts, MCP Apps negotiated)
 app.all('/mcp', async (c) => {
   try {
-    return await handleMCPHttpRequest(c.env, c.req.raw);
+    return await handleMCPHttpRequest(c.env, c.req.raw, FULL_PROFILE, '/mcp');
   } catch (error) {
     console.error('MCP endpoint error:', error);
     return c.json({
@@ -172,28 +178,40 @@ app.all('/mcp', async (c) => {
   }
 });
 
-// Health check for MCP
+// MCP endpoint — tools-only surface for hosts that ignore resources and
+// prompts (e.g. Cursor, Gemini CLI). Nothing is lost: the memory:// resources
+// and the workflow prompts are reprojected as tools. There is no capability
+// flag for this in any protocol revision, so it is selected by URL.
+app.all('/mcp/tools-only', async (c) => {
+  try {
+    return await handleMCPHttpRequest(c.env, c.req.raw, TOOLS_ONLY_PROFILE, '/mcp/tools-only');
+  } catch (error) {
+    console.error('MCP endpoint error:', error);
+    return c.json({
+      error: 'MCP server error',
+      message: error instanceof Error ? error.message : String(error)
+    }, 500);
+  }
+});
+
+// Health check for MCP.
+// The endpoint listing is derived from the server itself rather than restated
+// here, so it cannot drift from what the tools actually are.
 app.get('/mcp/health', (c) => {
   return c.json({
     mcp: 'ready',
     version: '1.0.0',
-    capabilities: ['tools', 'resources', 'prompts'],
-    tools: [
-      'add_memory',
-      'get_memory',
-      'list_memories',
-      'delete_memory',
-      'find_memories',
-      'add_tags',
-      'update_url_content',
-      'promote_memory',
-      'review_temporary_memories',
-      'update_memory',
-      'list_tags',
-      'rename_tag',
-      'merge_tags',
-      'set_tag_parent'
-    ]
+    endpoints: {
+      '/mcp': {
+        capabilities: ['tools', 'resources', 'prompts'],
+        notes: 'Full surface. MCP Apps (ui:// resources) are advertised only to clients that declare the io.modelcontextprotocol/ui extension.'
+      },
+      '/mcp/tools-only': {
+        capabilities: ['tools'],
+        notes: 'For hosts that ignore resources and prompts. Both are reprojected as tools (list/read_memory_resource, list/get_workflow), so no functionality is lost.'
+      }
+    },
+    tools: describeTools()
   });
 });
 
