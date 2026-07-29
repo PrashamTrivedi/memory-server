@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "A developer memory server hosted on Cloudflare with MCP support",
   "main": "src/index.ts",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
