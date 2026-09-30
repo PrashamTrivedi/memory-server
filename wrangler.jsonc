@@ -1,7 +1,7 @@
 {
   "name": "memory-server",
   "main": "src/index.ts",
-  "compatibility_date": "2025-08-15",
+  "compatibility_date": "2026-04-16",
   "compatibility_flags": [
     "nodejs_compat"
   ],
@@ -70,6 +70,17 @@
     {
       "binding": "SKILL_TEMPLATES",
       "bucket_name": "memory-skill-templates"
+    }
+  ],
+  // AI Search binding (Spike 1) — hybrid (semantic + BM25) search backend.
+  // Instance created via `wrangler ai-search create memory-server-search`.
+  // Backfill existing D1 memories via:
+  //   POST /api/admin/ai-search/backfill?limit=50&offset=0
+  // Service code in src/services/aiSearch.ts is no-op if this binding is absent.
+  "ai_search": [
+    {
+      "binding": "AI_SEARCH",
+      "instance_name": "memory-server-search"
     }
   ]
 }

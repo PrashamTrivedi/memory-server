@@ -10,6 +10,7 @@ import {
 import { MemoryError, MemoryNotFoundError } from '../errors/memoryErrors';
 import { TagHierarchyService } from '../services/tagHierarchy';
 import { TemporaryMemoryService } from '../services/temporaryMemory';
+import { AiSearchService } from '../services/aiSearch';
 import { sendFormattedResponse, prefersMarkdown } from '../utils/responseFormatter';
 import {
   formatMemoryAsMarkdown,
@@ -83,6 +84,7 @@ export async function createMemory(c: Context<{ Bindings: Env }>) {
         throw new MemoryNotFoundError(id);
       }
       memory = createdMemory;
+      c.executionCtx.waitUntil(AiSearchService.indexMemory(c.env, memory));
     }
 
     // Format response based on Accept header
@@ -142,6 +144,7 @@ export async function getMemory(c: Context<{ Bindings: Env }>) {
 
         memory.content = updatedContent;
         memory.updated_at = Math.floor(Date.now() / 1000);
+        c.executionCtx.waitUntil(AiSearchService.indexMemory(c.env, memory));
       }
     }
 
@@ -315,6 +318,8 @@ export async function updateMemory(c: Context<{ Bindings: Env }>) {
       throw new MemoryNotFoundError(id);
     }
 
+    c.executionCtx.waitUntil(AiSearchService.indexMemory(c.env, updatedMemory));
+
     // Format response based on Accept header
     const markdown = formatMemoryAsMarkdown(updatedMemory);
     const jsonData = {
@@ -360,6 +365,7 @@ export async function deleteMemory(c: Context<{ Bindings: Env }>) {
 
     // Delete memory (cascade will handle memory_tags)
     await c.env.DB.prepare('DELETE FROM memories WHERE id = ?').bind(id).run();
+    c.executionCtx.waitUntil(AiSearchService.removeMemory(c.env, id));
 
     // Format response based on Accept header
     const markdown = formatSuccessResponse(`Memory deleted successfully`, { id, deleted: true });
@@ -434,30 +440,46 @@ export async function findMemories(c: Context<{ Bindings: Env }>) {
     // Bound D1 fetch by the requested page window.
     const fetchSize = Math.min(offset + limit, 200);
 
-    // Search D1 (permanent memories) — top-N by relevance/date with preview only.
+    // Try AI Search first when a text query is present (semantic + keyword hybrid).
     let d1Memories: Memory[] = [];
     let d1Total = 0;
-    if (query && tags && tags.length > 0) {
-      const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, fetchSize, 0);
-      d1Memories = result.memories;
-      d1Total = result.total;
-    } else if (query) {
-      const result = await searchMemoriesByQuery(c.env.DB, query, fetchSize, 0);
-      d1Memories = result.memories;
-      d1Total = result.total;
-    } else if (tags && tags.length > 0) {
-      const result = await searchMemoriesByTags(c.env.DB, tags, fetchSize, 0);
-      d1Memories = result.memories;
-      d1Total = result.total;
+    let usedAiSearch = false;
+    if (query) {
+      const hits = await AiSearchService.searchMemories(c.env, query, offset + limit);
+      if (hits && hits.length > 0) {
+        const ranked = await loadMemoriesByIdsRanked(c.env.DB, hits.map(h => h.id));
+        d1Memories = tags && tags.length > 0
+          ? ranked.filter(m => tags.every((t: string) => m.tags.includes(t)))
+          : ranked;
+        d1Total = d1Memories.length;
+        usedAiSearch = true;
+      }
+    }
+
+    if (!usedAiSearch) {
+      // Search D1 (permanent memories) — top-N by relevance/date with preview only.
+      if (query && tags && tags.length > 0) {
+        const result = await searchMemoriesByQueryAndTags(c.env.DB, query, tags, fetchSize, 0);
+        d1Memories = result.memories;
+        d1Total = result.total;
+      } else if (query) {
+        const result = await searchMemoriesByQuery(c.env.DB, query, fetchSize, 0);
+        d1Memories = result.memories;
+        d1Total = result.total;
+      } else if (tags && tags.length > 0) {
+        const result = await searchMemoriesByTags(c.env.DB, tags, fetchSize, 0);
+        d1Memories = result.memories;
+        d1Total = result.total;
+      }
     }
 
     // Search temporary memories in KV (small set)
     const tempMatches = await TemporaryMemoryService.search(c.env, query || '', tags);
 
-    // Merge and sort by updated_at desc, then slice the requested window.
-    const merged = [...d1Memories, ...tempMatches].sort(
-      (a, b) => b.updated_at - a.updated_at
-    );
+    // Preserve semantic rank for AI Search results; otherwise fall back to recency.
+    const merged = usedAiSearch
+      ? [...d1Memories, ...tempMatches.sort((a, b) => b.updated_at - a.updated_at)]
+      : [...d1Memories, ...tempMatches].sort((a, b) => b.updated_at - a.updated_at);
     const paginated = merged.slice(offset, offset + limit);
     const total = d1Total + tempMatches.length;
 
@@ -609,6 +631,43 @@ async function fetchUrlContent(env: Env, url: string): Promise<string | null> {
     console.error('Failed to fetch URL content:', error);
     return null;
   }
+}
+
+/**
+ * Hydrate memories from D1 in the same order as the given ID list.
+ * IDs not present in D1 are silently dropped (e.g. orphaned AI Search items).
+ */
+async function loadMemoriesByIdsRanked(db: D1Database, ids: string[]): Promise<Memory[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  const rowsResult = await db
+    .prepare(
+      `SELECT id, name, content, url, created_at, updated_at
+       FROM memories
+       WHERE id IN (${placeholders})`
+    )
+    .bind(...ids)
+    .all<MemoryRow>();
+
+  const rows = rowsResult.results || [];
+  if (rows.length === 0) return [];
+
+  const tagMap = await getMemoryTagsBatch(db, rows.map(r => r.id));
+
+  const byId = new Map<string, Memory>();
+  for (const row of rows) {
+    byId.set(row.id, {
+      id: row.id,
+      name: row.name,
+      content: row.content,
+      url: row.url || undefined,
+      tags: tagMap.get(row.id) || [],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    });
+  }
+
+  return ids.map(id => byId.get(id)).filter((m): m is Memory => Boolean(m));
 }
 
 /**

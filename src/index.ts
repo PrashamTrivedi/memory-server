@@ -5,6 +5,7 @@ import * as memoryHandlers from './handlers/memory';
 import * as apiKeyHandlers from './handlers/apiKeys';
 import * as skillHandlers from './handlers/skills';
 import * as mcpAppsAdminHandlers from './handlers/mcpAppsAdmin';
+import { backfillAiSearch } from './handlers/aiSearchAdmin';
 import { handleMCPHttpRequest, describeTools, FULL_PROFILE, TOOLS_ONLY_PROFILE } from './mcp/server';
 import { getEntityName } from './middleware/apiKeyAuth';
 import { dualAuth } from './middleware/dualAuth';
@@ -155,6 +156,9 @@ app.get('/api/admin/keys', apiKeyHandlers.listApiKeys);
 app.get('/api/admin/keys/:id', apiKeyHandlers.getApiKey);
 app.patch('/api/admin/keys/:id', apiKeyHandlers.updateApiKey);
 app.delete('/api/admin/keys/:id', apiKeyHandlers.revokeApiKey);
+
+// AI Search admin endpoints (Spike 1)
+app.post('/api/admin/ai-search/backfill', backfillAiSearch);
 
 // MCP Apps Admin endpoints
 app.get('/api/admin/mcp-apps', mcpAppsAdminHandlers.listMcpApps);

@@ -6,6 +6,7 @@ import {
 } from '../../../types/index';
 import { TagHierarchyService } from '../../services/tagHierarchy';
 import { TemporaryMemoryService } from '../../services/temporaryMemory';
+import { AiSearchService } from '../../services/aiSearch';
 import {
   formatMemoryAsMarkdown,
   formatMemoryListAsMarkdown,
@@ -118,6 +119,7 @@ export async function handleAddMemory(env: Env, args: any): Promise<any> {
       // Fetch the created memory with tags
       const createdMemory = await getMemoryById(env.DB, id);
       memory = createdMemory!;
+      await AiSearchService.indexMemory(env, memory);
     }
 
     // Format as markdown
@@ -192,6 +194,7 @@ export async function handleGetMemory(env: Env, args: any): Promise<any> {
 
         memory.content = updatedContent;
         memory.updated_at = Math.floor(Date.now() / 1000);
+        await AiSearchService.indexMemory(env, memory);
       }
     }
 
@@ -351,6 +354,7 @@ export async function handleDeleteMemory(env: Env, args: any): Promise<any> {
 
     // Delete memory (cascade will handle memory_tags)
     await env.DB.prepare('DELETE FROM memories WHERE id = ?').bind(id).run();
+    await AiSearchService.removeMemory(env, id);
 
     // Format as markdown
     const markdown = formatSuccessResponse(
@@ -440,6 +444,9 @@ export async function handleUpdateUrlContent(env: Env, args: any): Promise<any> 
 
     // Return updated memory
     const updatedMemory = await getMemoryById(env.DB, id);
+    if (updatedMemory) {
+      await AiSearchService.indexMemory(env, updatedMemory);
+    }
 
     // Format as markdown
     const markdown = formatMemoryAsMarkdown(updatedMemory!);
@@ -848,6 +855,9 @@ export async function handleUpdateMemory(env: Env, args: any): Promise<any> {
 
       // Fetch updated memory
       const updatedMemory = await getMemoryById(env.DB, id);
+      if (updatedMemory) {
+        await AiSearchService.indexMemory(env, updatedMemory);
+      }
 
       const markdown = formatMemoryAsMarkdown(updatedMemory!);
       const structuredData = {
@@ -902,6 +912,9 @@ export async function handleUpdateMemory(env: Env, args: any): Promise<any> {
     }
 
     const newMemory = await getMemoryById(env.DB, id);
+    if (newMemory) {
+      await AiSearchService.indexMemory(env, newMemory);
+    }
 
     const markdown = formatMemoryAsMarkdown(newMemory!);
     const structuredData = {

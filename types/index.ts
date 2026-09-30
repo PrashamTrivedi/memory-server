@@ -182,4 +182,8 @@ export interface Env {
   // Email notification settings (optional)
   EMAIL_API_KEY?: string;
   NOTIFICATION_EMAIL?: string;
+
+  // Cloudflare AI Search binding (optional, Spike 1).
+  // Typed as `any` until @cloudflare/workers-types ships AI Search types.
+  AI_SEARCH?: any;
 }

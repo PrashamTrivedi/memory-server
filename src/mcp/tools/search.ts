@@ -2,6 +2,7 @@ import type { Env } from '../../index';
 import { Memory } from '../../../types/index';
 import { TemporaryMemoryService } from '../../services/temporaryMemory';
 import { TagHierarchyService } from '../../services/tagHierarchy';
+import { AiSearchService } from '../../services/aiSearch';
 import {
   formatSearchResultsAsMarkdown,
   formatMemoryAsMarkdown,
@@ -66,26 +67,44 @@ export async function handleFindMemories(env: Env, args: any): Promise<any> {
       throw new Error('Either query or tags parameter is required');
     }
 
-    // Search D1 (permanent memories)
+    // Try AI Search first when a text query is present (semantic + keyword hybrid).
+    // Fall back to D1 FTS on null (disabled / errored) or empty.
     let d1Memories: Memory[] = [];
-    if (query && tags && tags.length > 0) {
-      const result = await searchMemoriesByQueryAndTags(env.DB, query, tags, 1000, 0);
-      d1Memories = result.memories;
-    } else if (query) {
-      const result = await searchMemoriesByQuery(env.DB, query, 1000, 0);
-      d1Memories = result.memories;
-    } else if (tags && tags.length > 0) {
-      const result = await searchMemoriesByTags(env.DB, tags, 1000, 0);
-      d1Memories = result.memories;
+    let usedAiSearch = false;
+    if (query) {
+      const hits = await AiSearchService.searchMemories(env, query, offset + limit);
+      if (hits && hits.length > 0) {
+        const ranked = await loadMemoriesByIdsRanked(env.DB, hits.map(h => h.id));
+        d1Memories = tags && tags.length > 0
+          ? ranked.filter(m => tags.every((t: string) => m.tags.includes(t)))
+          : ranked;
+        usedAiSearch = true;
+      }
+    }
+
+    if (!usedAiSearch) {
+      if (query && tags && tags.length > 0) {
+        const result = await searchMemoriesByQueryAndTags(env.DB, query, tags, 1000, 0);
+        d1Memories = result.memories;
+      } else if (query) {
+        const result = await searchMemoriesByQuery(env.DB, query, 1000, 0);
+        d1Memories = result.memories;
+      } else if (tags && tags.length > 0) {
+        const result = await searchMemoriesByTags(env.DB, tags, 1000, 0);
+        d1Memories = result.memories;
+      }
     }
 
     // Search temporary memories in KV
     const tempMemories = await TemporaryMemoryService.search(env, query || '', tags);
 
-    // Merge and sort by updated_at desc
-    const allMemories = [...d1Memories, ...tempMemories].sort(
-      (a, b) => b.updated_at - a.updated_at
-    );
+    // Preserve semantic rank for AI Search results; otherwise fall back to recency.
+    const allMemories = usedAiSearch
+      ? [
+          ...d1Memories,
+          ...tempMemories.sort((a, b) => b.updated_at - a.updated_at),
+        ]
+      : [...d1Memories, ...tempMemories].sort((a, b) => b.updated_at - a.updated_at);
 
     const total = allMemories.length;
 
@@ -220,6 +239,9 @@ export async function handleAddTags(env: Env, args: any): Promise<any> {
 
     // Return updated memory with all tags
     const updatedMemory = await getMemoryById(env.DB, memoryId);
+    if (updatedMemory) {
+      await AiSearchService.indexMemory(env, updatedMemory);
+    }
 
     // Format as markdown
     const markdown = formatMemoryAsMarkdown(updatedMemory!);
@@ -393,6 +415,60 @@ async function searchMemoriesByQueryAndTags(db: D1Database, query: string, tagNa
     memories,
     total: countResult?.count || 0
   };
+}
+
+/**
+ * Hydrate memories from D1 in the same order as the given ID list.
+ * IDs not present in D1 are silently dropped (e.g. orphaned AI Search items).
+ */
+async function loadMemoriesByIdsRanked(db: D1Database, ids: string[]): Promise<Memory[]> {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  const rowsResult = await db
+    .prepare(
+      `SELECT id, name, content, url, created_at, updated_at
+       FROM memories
+       WHERE id IN (${placeholders})`
+    )
+    .bind(...ids)
+    .all<any>();
+
+  const rows = rowsResult.results || [];
+  if (rows.length === 0) return [];
+
+  const tagRowsResult = await db
+    .prepare(
+      `SELECT mt.memory_id, t.name
+       FROM memory_tags mt
+       JOIN tags t ON t.id = mt.tag_id
+       WHERE mt.memory_id IN (${placeholders})
+       ORDER BY mt.memory_id, t.name`
+    )
+    .bind(...ids)
+    .all<{ memory_id: string; name: string }>();
+
+  const tagMap = new Map<string, string[]>();
+  for (const r of tagRowsResult.results || []) {
+    const list = tagMap.get(r.memory_id) || [];
+    list.push(r.name);
+    tagMap.set(r.memory_id, list);
+  }
+
+  const byId = new Map<string, Memory>();
+  for (const row of rows) {
+    byId.set(row.id, {
+      id: row.id,
+      name: row.name,
+      content: row.content,
+      url: row.url || undefined,
+      tags: tagMap.get(row.id) || [],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    });
+  }
+
+  // Preserve incoming ID order (which carries semantic rank).
+  return ids.map(id => byId.get(id)).filter((m): m is Memory => Boolean(m));
 }
 
 async function getMemoryById(db: D1Database, id: string): Promise<Memory | null> {
